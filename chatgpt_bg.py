@@ -1006,24 +1006,35 @@ def process(jewel_path, tag_path, bg_path, is_first=False, category="jewellery",
     _status(f"{tag}📝 Building prompt (job:{_jid})")
     prompt = build_prompt(category, _jid, filename=_filename)
 
-    # Upload 3 unique images with thumbnail verification
+    # Upload 3 images — verify at least thumbnails appeared, retry once if not
     _status(f"{tag}📎 Uploading 3 images")
     files = [make_unique(p) for p in [jewel_path, tag_path, bg_path]]
-    try:
-        _upload_with_verify(driver, wait, files, tag)
-    except Exception as e:
-        _status(f"{tag}⚠️ Upload error: {e} — retrying")
+
+    def _count_input_imgs():
         try:
-            dismiss_dialogs(driver)
-            time.sleep(2)
-            fi = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, 'input[type="file"]')))
-            for f in files:
-                fi.send_keys(f); time.sleep(2)
-        except Exception as e2:
-            _status(f"{tag}❌ Upload failed twice: {e2}")
+            return driver.execute_script("""
+                const inp = document.querySelector('#prompt-textarea,div[contenteditable="true"]');
+                if (!inp) return 0;
+                // thumbnails are siblings — check the whole composer area
+                const composer = inp.closest('form') || inp.parentElement?.parentElement;
+                return composer ? composer.querySelectorAll('img').length : 0;
+            """) or 0
+        except Exception:
+            return 0
+
+    _upload_with_verify(driver, wait, files, tag)
+    time.sleep(0.5)
+
+    # If no thumbnails appeared, retry once
+    if _count_input_imgs() == 0:
+        _status(f"{tag}⚠️ No thumbnails after upload — retrying paste")
+        _upload_with_verify(driver, wait, files, tag)
+        time.sleep(0.5)
+        n = _count_input_imgs()
+        _status(f"{tag}  {n} thumbnail(s) in input after retry")
 
     dismiss_dialogs(driver)
-    time.sleep(0.5)
+    time.sleep(0.3)
 
     # Wait for input to be ready (not locked by previous generation)
     _status(f"{tag}✍️ Typing prompt")

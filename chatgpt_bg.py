@@ -1045,6 +1045,10 @@ def process(jewel_path, tag_path, bg_path, is_first=False, category="jewellery",
         except Exception:
             pass
 
+    # Dismiss any open modal/dialog before doing anything
+    dismiss_dialogs(driver)
+    time.sleep(0.3)
+
     # Check login
     if not _ensure_logged_in(driver):
         return {"label": None, "output": None,

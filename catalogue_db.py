@@ -158,10 +158,24 @@ def check_and_record(label: str, output_path: str, category: str = "") -> list:
         e_out   = e.get("output", "")
 
         label_match = bool(clean_label and e_label and clean_label == e_label)
-        hash_match  = False
+        hash_close  = False
         if new_hash and e_hash:
             dist = _hash_dist(new_hash, e_hash)
-            hash_match = dist <= HASH_DIST_THRESHOLD
+            hash_close = dist <= HASH_DIST_THRESHOLD
+
+        # ── For any hash-based suspicion, confirm with Gemma before flagging ──
+        gemma_confirmed_same = None
+        gemma_reason = ""
+        if hash_close and output_path and os.path.exists(output_path) and \
+                e_out and os.path.exists(e_out):
+            g = _gemma_same_design(output_path, e_out)
+            gemma_confirmed_same = g["same"]
+            gemma_reason = g["reason"]
+            # If Gemma says different design and is confident → not a match
+            if g["same"] is False and g["confidence"] in ("high", "medium"):
+                hash_close = False  # override hash match — Gemma wins
+
+        hash_match = hash_close  # final decision after Gemma
 
         if hash_match and label_match:
             findings.append({
@@ -169,7 +183,8 @@ def check_and_record(label: str, output_path: str, category: str = "") -> list:
                 "label":   e.get("label"),
                 "date":    e_date,
                 "output":  e_out,
-                "message": f"Exact duplicate — same design & tag {label} was processed on {e_date}"
+                "message": f"Exact duplicate — same design & tag {label} processed on {e_date}. "
+                           f"Gemma: {gemma_reason}"
             })
 
         elif hash_match and not label_match:
@@ -180,12 +195,20 @@ def check_and_record(label: str, output_path: str, category: str = "") -> list:
                 "output":  e_out,
                 "message": (
                     f"Same design but different tag — "
-                    f"this design was saved as '{e.get('label')}' on {e_date}. "
-                    f"Current tag is '{label}'. Possible mislabel?"
+                    f"saved as '{e.get('label')}' on {e_date}, now tagged '{label}'. "
+                    f"Gemma: {gemma_reason}"
                 )
             })
 
         elif label_match and not hash_match:
+            # Same tag, different hash — still run Gemma to check if design really differs
+            if output_path and os.path.exists(output_path) and e_out and os.path.exists(e_out) \
+                    and gemma_confirmed_same is None:
+                g = _gemma_same_design(output_path, e_out)
+                gemma_confirmed_same = g["same"]
+                gemma_reason = g["reason"]
+            # Only flag if Gemma also says designs differ (or Gemma unavailable)
+            if gemma_confirmed_same is not True:
             findings.append({
                 "type":    "same_tag_diff_design",
                 "label":   e.get("label"),

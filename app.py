@@ -454,6 +454,17 @@ def _run_chatgpt_job(pairs, category, bg_name):
         safe     = re.sub(r'[/\\:*?"<>|]', '_', label)
         out_path = os.path.join(out_dir, f"{safe}.jpg")
 
+        # ── In-run duplicate tag check — skip before even saving ──────
+        clean_label = label.strip().upper()
+        if clean_label and not clean_label.startswith("AJ-") and clean_label in seen_tags_this_run:
+            CGPT_JOB["current"] = f"⏭ Pair {s['pair']} — tag {label} already saved this run, skipping"
+            results.append({"pair": s["pair"], "sku": label, "output": None,
+                            "error": f"Skipped — tag {label} already processed in this batch",
+                            "skipped": True})
+            CGPT_JOB["done"]    = i + 1
+            CGPT_JOB["results"] = results
+            continue
+
         if result.get("output") and os.path.exists(result["output"]):
             os.replace(result["output"], out_path)
 

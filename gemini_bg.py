@@ -354,58 +354,69 @@ def process(jewel_path, tag_path, bg_path, category="earrings",
     prompt = build_prompt(category, _jid, filename=_filename)
     files  = [make_unique(p) for p in [jewel_path, tag_path, bg_path]]
 
-    _status(f"{tag}📎 Uploading images + typing prompt into Gemini")
+    _status(f"{tag}📎 Uploading images to Gemini")
 
     try:
-        # ── Step 1: Upload files via hidden file input ─────────────────────
-        # Gemini has a hidden input[type=file] — expose and send paths directly
+        # ── Step 1: Upload files ──────────────────────────────────────────
+        # Gemini's + button opens a menu → click "Upload file" → file input appears
         all_paths = "\n".join(os.path.abspath(f) for f in files)
 
-        # Try to find any file input on page
-        file_input = None
-        for sel in ['input[type="file"]', 'input[accept*="image"]', 'input[accept*="*"]']:
-            try:
-                els = driver.find_elements(By.CSS_SELECTOR, sel)
-                if els:
-                    file_input = els[0]
-                    break
-            except Exception:
-                pass
+        def _try_file_input():
+            """Find any file input and send paths. Returns True on success."""
+            inputs = driver.find_elements(By.CSS_SELECTOR, 'input[type="file"]')
+            for fi in inputs:
+                try:
+                    driver.execute_script("""
+                        arguments[0].style.cssText =
+                            'display:block!important;visibility:visible!important;opacity:1!important;';
+                    """, fi)
+                    fi.send_keys(all_paths)
+                    return True
+                except Exception:
+                    continue
+            return False
 
-        if not file_input:
-            # Click the + (add) button to reveal file options
-            _status(f"{tag}  clicking + button to reveal file upload")
+        uploaded = False
+
+        # Method 1: direct file input (sometimes already accessible)
+        if _try_file_input():
+            uploaded = True
+            _status(f"{tag}  files uploaded via direct input")
+            time.sleep(2)
+
+        if not uploaded:
+            # Method 2: click + button → wait for menu → click upload option
+            _status(f"{tag}  clicking + to open upload menu")
             driver.execute_script("""
+                // + button has aria-label like "Add more" or just shows "+"
                 const btn = Array.from(document.querySelectorAll('button')).find(b => {
-                    const l = (b.getAttribute('aria-label') || b.textContent || b.title || '').trim();
-                    return l === '+' || l.toLowerCase().includes('add') ||
-                           l.toLowerCase().includes('attach') || l.toLowerCase().includes('more');
+                    const l = (b.getAttribute('aria-label') || b.textContent || '').trim();
+                    return l === '+' || /^add/i.test(l) || /more options/i.test(l);
                 });
                 if (btn) btn.click();
             """)
-            time.sleep(1)
-            # Look for file input again after menu opens
-            for sel in ['input[type="file"]']:
-                try:
-                    els = driver.find_elements(By.CSS_SELECTOR, sel)
-                    if els:
-                        file_input = els[0]
-                        break
-                except Exception:
-                    pass
+            time.sleep(1.2)
 
-        if file_input:
+            # Click upload/image option in the menu
             driver.execute_script("""
-                arguments[0].style.display = 'block';
-                arguments[0].style.visibility = 'visible';
-                arguments[0].style.opacity = '1';
-            """, file_input)
-            time.sleep(0.3)
-            file_input.send_keys(all_paths)
-            _status(f"{tag}  files sent to input")
-            time.sleep(2)
-        else:
-            _status(f"{tag}⚠️ No file input found — continuing without images")
+                const items = Array.from(document.querySelectorAll(
+                    '[role="menuitem"], [role="option"], button, li'));
+                const upload = items.find(el => {
+                    const t = (el.textContent || el.getAttribute('aria-label') || '').toLowerCase();
+                    return t.includes('upload') || t.includes('image') || t.includes('photo') ||
+                           t.includes('file') || t.includes('computer');
+                });
+                if (upload) upload.click();
+            """)
+            time.sleep(1)
+
+            if _try_file_input():
+                uploaded = True
+                _status(f"{tag}  files uploaded via menu")
+                time.sleep(2)
+
+        if not uploaded:
+            _status(f"{tag}⚠️ Could not upload files — prompt only")
 
         # ── Step 2: Find the text input ───────────────────────────────────
         # Gemini uses <rich-textarea> web component with inner contenteditable div

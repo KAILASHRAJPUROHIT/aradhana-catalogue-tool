@@ -264,24 +264,23 @@ def _find_catalogue_hwnds():
 
 
 def _chrome_to_background():
-    """Push our ChatGPT Chrome behind all other windows. User's personal Chrome is untouched."""
+    """Move Chrome back off-screen after login is done."""
     try:
         import ctypes
-        u32         = ctypes.windll.user32
-        HWND_BOTTOM = ctypes.wintypes.HWND(1)
-        SWP_FLAGS   = 0x0002 | 0x0001 | 0x0010   # NOMOVE | NOSIZE | NOACTIVATE
+        u32 = ctypes.windll.user32
         for hwnd in _find_catalogue_hwnds():
-            u32.SetWindowPos(hwnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_FLAGS)
+            u32.SetWindowPos(hwnd, 0, -32000, -32000, 1280, 900, 0x0010)
     except Exception:
         pass
 
 
 def _chrome_to_foreground():
-    """Bring ChatGPT Chrome to front — login prompts only."""
+    """Move Chrome ON-screen so user can log in, then it goes back off-screen after."""
     try:
         import ctypes
         u32 = ctypes.windll.user32
         for hwnd in _find_catalogue_hwnds():
+            u32.SetWindowPos(hwnd, 0, 100, 100, 1280, 900, 0x0010)  # move on-screen
             u32.ShowWindow(hwnd, 9)
             u32.SetForegroundWindow(hwnd)
     except Exception:

@@ -416,56 +416,15 @@ def process(jewel_path, tag_path, bg_path, category="earrings",
     if not _ensure_logged_in(driver):
         return {"label": None, "output": None, "error": "Gemini: not logged in"}
 
-    # ── 2. Switch to 2.0 Flash (faster + better than Flash-Lite) ─────────────
-    try:
-        switched = driver.execute_script("""
-            // Click the model picker button
-            const picker = document.querySelector('button[aria-label*="mode picker"], button[aria-label*="Flash"]');
-            if (!picker) return 'no-picker';
-            picker.click();
-            return 'opened';
-        """)
-        if switched == 'opened':
-            time.sleep(0.8)
-            driver.execute_script("""
-                // Find and click "2.0 Flash" option in the dropdown
-                const items = Array.from(document.querySelectorAll(
-                    '[role=option],[role=menuitem],[role=listitem],button,mat-option'));
-                const flash2 = items.find(el => {
-                    const t = el.textContent.trim();
-                    return t.includes('2.0 Flash') || t.includes('Gemini 2.0 Flash');
-                });
-                if (flash2) { flash2.click(); return 'switched'; }
-                // Close picker if model not found
-                document.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true}));
-                return 'not-found';
-            """)
-            time.sleep(0.5)
-    except Exception:
-        pass
+    # ── 2. Click input area to confirm page is ready ─────────────────────────
+    _status(f"{tag}✅ Page ready — clicking input")
+    _cdp_click(driver, *_C['input'])
+    time.sleep(0.5)
 
-    # ── 3. Wait for input to be ready ────────────────────────────────────────
-    input_el = None
-    for _ in range(10):
-        input_el = driver.execute_script("""
-            const rt = document.querySelector('rich-textarea');
-            if (rt) return rt.querySelector('[contenteditable="true"]');
-            return null;
-        """)
-        if input_el:
-            break
-        time.sleep(0.5)
+    # ── 3. Inject 3 images via ClipboardEvent into the focused Quill editor ──
+    _status(f"{tag}📎 Injecting 3 images")
 
-    if not input_el:
-        return {"label": None, "output": None, "error": "Gemini: input not ready"}
-
-    # ── 3. Inject images via synthetic paste event (bypasses Gemini upload UI) ──
-    # Gemini's upload menu uses Angular Material portals — no accessible file input.
-    # We inject images directly into the Quill editor as ClipboardEvent with File objects.
-    _status(f"{tag}📎 Injecting 3 images into Gemini")
-
-    def _inject_image_js(img_path, idx):
-        import base64 as _b64
+    def _inject_image(img_path, idx):
         from PIL import Image as _PIL
         import io as _io
         img = _PIL.open(img_path).convert("RGB")
@@ -478,71 +437,61 @@ def process(jewel_path, tag_path, bg_path, category="earrings",
             const binary = atob(b64);
             const bytes = new Uint8Array(binary.length);
             for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-            const file = new File([bytes], fname, {type: 'image/jpeg'});
+            const file = new File([bytes], fname, {type:'image/jpeg'});
             const editor = document.querySelector('rich-textarea .ql-editor');
             if (!editor) return 'no-editor';
             editor.focus();
             const dt = new DataTransfer();
             dt.items.add(file);
-            editor.dispatchEvent(new ClipboardEvent('paste', {
-                bubbles: true, cancelable: true, clipboardData: dt
-            }));
+            editor.dispatchEvent(new ClipboardEvent('paste',
+                {bubbles:true, cancelable:true, clipboardData:dt}));
             return 'ok';
         """, b64, f"img{idx}.jpg")
 
-    pasted_count = 0
+    pasted = 0
     for idx, img_path in enumerate([jewel_path, tag_path, bg_path], 1):
-        res = _inject_image_js(img_path, idx)
-        _status(f"{tag}  image {idx}/3 → {res}")
-        time.sleep(1.0)
+        res = _inject_image(img_path, idx)
+        _status(f"{tag}  img {idx}/3 → {res}")
+        time.sleep(0.8)
         if res == "ok":
-            pasted_count += 1
+            pasted += 1
+    _status(f"{tag}  {pasted}/3 images injected")
 
-    _status(f"{tag}  {pasted_count}/3 images injected")
-
-    # ── 4. Type prompt via execCommand (confirmed working from DOM diagnostic) ──
+    # ── 4. Type prompt via CDP insertText (no DOM query needed) ──────────────
     _filename = os.path.splitext(os.path.basename(jewel_path))[0]
     _jid = job_id or re.sub(r"[^A-Za-z0-9]", "", _filename)[:12]
     prompt = build_prompt(category, _jid, filename=_filename)
 
-    typed = driver.execute_script("""
-        const editor = document.querySelector('rich-textarea .ql-editor');
-        if (!editor) return false;
-        editor.focus();
-        return document.execCommand('insertText', false, arguments[0]);
-    """, prompt)
+    # Click input to ensure focus, then insert text
+    _cdp_click(driver, *_C['input'])
+    time.sleep(0.2)
+    _cdp_type(driver, prompt)
     time.sleep(0.4)
+    _status(f"{tag}📝 Prompt typed via CDP")
 
-    if not typed:
-        input_el.click()
-        input_el.send_keys(prompt)
-        time.sleep(0.3)
-
-    _status(f"{tag}📝 Prompt typed — {pasted_count}/3 images + prompt ready")
-
-    # ── 5. Snapshot all current images BEFORE sending ─────────────────────────
+    # ── 5. Snapshot current images before sending ─────────────────────────────
     pre_srcs = set()
     try:
         pre_srcs = set(driver.execute_script(
             "return Array.from(document.querySelectorAll('img'))"
-            ".map(i=>i.src||'').filter(s=>s);"
-        ) or [])
+            ".map(i=>i.src||'').filter(s=>s);") or [])
     except Exception:
         pass
 
-    # ── 6. Send — confirmed selector: button[aria-label="Send message"] ──────
-    time.sleep(0.3)
-    # Poll up to 3s for send button to appear (only shows when input has content)
+    # ── 6. Send via coordinate click (confirmed position: 964, 407) ──────────
+    time.sleep(0.2)
     sent = False
-    for _ in range(6):
-        result = driver.execute_script("""
-            const btn = document.querySelector('button[aria-label="Send message"]');
-            if (btn && !btn.disabled) { btn.click(); return 'send-message'; }
-            return null;
+    for _ in range(6):   # poll up to 3s — send button only appears with content
+        _cdp_click(driver, *_C['send'])
+        time.sleep(0.5)
+        # Verify message was sent (stop button appears or input clears)
+        gone = driver.execute_script("""
+            const ed = document.querySelector('rich-textarea .ql-editor');
+            return !ed || ed.textContent.trim() === '';
         """)
-        if result:
+        if gone:
             sent = True
-            _status(f"{tag}📤 Send button clicked ({result})")
+            _status(f"{tag}📤 Sent via coordinate click")
             break
         time.sleep(0.5)
     if not sent:

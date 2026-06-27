@@ -179,23 +179,25 @@ def _bg_for(category):
     return path if os.path.exists(path) else os.path.join(BACKGROUNDS_DIR, "earrings.png")
 
 def _ensure_chrome():
-    """Launch Chrome with remote debugging if port 9222 is not open."""
+    """Launch ChatGPT-dedicated Chrome on port 9222. Opens directly on chatgpt.com."""
     import socket as _s, subprocess
     try:
         c = _s.create_connection(("127.0.0.1", 9222), timeout=2)
         c.close()
-        return True   # already running
+        return True
     except OSError:
         pass
-    CGPT_JOB["current"] = "🚀 Starting Chrome…"
+    CGPT_JOB["current"] = "🚀 Starting ChatGPT Chrome…"
     subprocess.Popen([
         r"C:\Program Files\Google\Chrome\Application\chrome.exe",
         "--remote-debugging-port=9222",
         r"--user-data-dir=C:\Users\kaila\AppData\Local\AutoCatalogueChrome",
-        "--no-first-run", "--no-default-browser-check"
+        "--no-first-run", "--no-default-browser-check",
+        "--homepage=https://chatgpt.com",
+        "https://chatgpt.com",          # opens this URL on launch
     ])
     import time as _t; _t.sleep(6)
-    return False   # we just launched it
+    return False
 
 def _gemma_read_tag(tag_path):
     """Read tag label with Gemma. Returns label string or ''."""

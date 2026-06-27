@@ -715,6 +715,53 @@ def api_ps_progress():
 
 ADMIN_PASSWORD = "Aradhana1992"   # change anytime in app.py
 
+REPROCESS_QUEUE = []   # pairs queued for reprocessing after rejection
+
+@app.route("/api/reject", methods=["POST"])
+def api_reject():
+    data     = request.json or {}
+    pair_num = data.get("pair")
+    sku      = data.get("sku", "")
+    if pair_num is None:
+        return jsonify({"ok": False, "error": "pair number required"}), 400
+
+    # Find the pair on disk and add to reprocess queue
+    pairs = _derive_pairs_from_disk()
+    match = next((p for p in pairs if p["pair"] == pair_num), None)
+    if not match:
+        return jsonify({"ok": False, "error": f"Pair {pair_num} not found on disk"}), 404
+
+    # Move its output to a _rejected folder so it doesn't count as done
+    for cat in os.listdir(OUTPUT):
+        cat_dir = os.path.join(OUTPUT, cat)
+        if not os.path.isdir(cat_dir):
+            continue
+        for f in os.listdir(cat_dir):
+            if sku and sku.replace("/", "_") in f:
+                rej_dir = os.path.join(cat_dir, "_rejected")
+                os.makedirs(rej_dir, exist_ok=True)
+                os.rename(os.path.join(cat_dir, f), os.path.join(rej_dir, f))
+
+    # Remove from progress cache so it reprocesses
+    for cat in os.listdir(BASE):
+        if cat.startswith("progress_") and cat.endswith(".json"):
+            try:
+                p = os.path.join(BASE, cat)
+                data = json.load(open(p))
+                data.pop(str(pair_num), None)
+                json.dump(data, open(p, "w"), indent=2)
+            except Exception:
+                pass
+
+    REPROCESS_QUEUE.append(match)
+    return jsonify({"ok": True, "pair": pair_num, "queued": len(REPROCESS_QUEUE)})
+
+
+@app.route("/api/reprocess_queue")
+def api_reprocess_queue():
+    return jsonify({"queue": REPROCESS_QUEUE, "count": len(REPROCESS_QUEUE)})
+
+
 @app.route("/api/upload_bg", methods=["POST"])
 def api_upload_bg():
     f = request.files.get("file")

@@ -91,40 +91,46 @@ def connect():
             time.sleep(3)
     raise RuntimeError("Gemini Chrome unreachable")
 
-def _chrome_to_background():
+def _find_chrome_hwnds2():
     try:
         import ctypes, ctypes.wintypes
         u32 = ctypes.windll.user32
-        HWND_BOTTOM = ctypes.wintypes.HWND(1)
-        SWP = 0x0002 | 0x0001 | 0x0010
         found = []
         def _cb(h, _):
+            if not u32.IsWindowVisible(h): return True
             buf = ctypes.create_unicode_buffer(256)
             u32.GetWindowTextW(h, buf, 256)
             if "chrome" in buf.value.lower() or "gemini" in buf.value.lower():
                 found.append(h)
             return True
-        u32.EnumWindows(ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.wintypes.HWND,
-                                           ctypes.wintypes.LPARAM)(_cb), 0)
-        for h in found:
-            u32.SetWindowPos(h, HWND_BOTTOM, 0, 0, 0, 0, SWP)
+        u32.EnumWindows(ctypes.WINFUNCTYPE(ctypes.c_bool,
+            ctypes.wintypes.HWND, ctypes.wintypes.LPARAM)(_cb), 0)
+        return found
+    except Exception:
+        return []
+
+def _chrome_to_background():
+    """Completely hide Chrome — invisible, off taskbar, off Alt+Tab."""
+    try:
+        import ctypes
+        u32 = ctypes.windll.user32
+        for h in _find_chrome_hwnds2():
+            style = u32.GetWindowLongW(h, -20)
+            style = (style | 0x00000080) & ~0x00040000
+            u32.SetWindowLongW(h, -20, style)
+            u32.ShowWindow(h, 0)
     except Exception:
         pass
 
 def _chrome_to_foreground():
+    """Reveal Chrome for login only."""
     try:
-        import ctypes, ctypes.wintypes
+        import ctypes
         u32 = ctypes.windll.user32
-        found = []
-        def _cb(h, _):
-            buf = ctypes.create_unicode_buffer(256)
-            u32.GetWindowTextW(h, buf, 256)
-            if "chrome" in buf.value.lower() or "gemini" in buf.value.lower():
-                found.append(h)
-            return True
-        u32.EnumWindows(ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.wintypes.HWND,
-                                           ctypes.wintypes.LPARAM)(_cb), 0)
-        for h in found:
+        for h in _find_chrome_hwnds2():
+            style = u32.GetWindowLongW(h, -20)
+            style = (style | 0x00040000) & ~0x00000080
+            u32.SetWindowLongW(h, -20, style)
             u32.ShowWindow(h, 9)
             u32.SetForegroundWindow(h)
     except Exception:

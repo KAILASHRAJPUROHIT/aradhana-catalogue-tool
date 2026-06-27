@@ -528,24 +528,30 @@ def process(jewel_path, tag_path, bg_path, category="earrings",
     safe = re.sub(r'[/\\:*?"<>|]', '_', label or "studio")
     out  = os.path.join(OUTPUT, f"{safe}_gemini.png")
 
-    # Method A: requests with cookies (works for Google CDN URLs)
+    # ── Download — NO navigation or deletion here ─────────────────────────────
+    # The next process() call navigates to /app fresh anyway, so deleting
+    # the chat here just causes an unwanted reload. Skip it.
+
+    # Method A: Python requests with session cookies
     try:
         cookies = {c["name"]: c["value"] for c in driver.get_cookies()}
         ua      = driver.execute_script("return navigator.userAgent;")
-        resp    = _req.get(img_src, cookies=cookies, headers={"User-Agent": ua}, timeout=30)
+        resp    = _req.get(img_src, cookies=cookies,
+                           headers={"User-Agent": ua}, timeout=30)
         if resp.status_code == 200 and len(resp.content) > 5000:
             with open(out, "wb") as f: f.write(resp.content)
-            _status(f"{tag}✓ {label} saved via requests ({len(resp.content)//1024}KB)")
-            _delete_chat(driver, _current_chat_url)
+            _status(f"{tag}✓ {label} saved ({len(resp.content)//1024}KB)")
             return {"label": label, "output": out, "error": None}
+        _status(f"{tag}  requests: {resp.status_code} — trying canvas")
     except Exception as e:
-        _status(f"{tag}  requests failed: {e}")
+        _status(f"{tag}  requests failed: {e} — trying canvas")
 
-    # Method B: canvas toDataURL (for blob: or restricted URLs)
+    # Method B: canvas toDataURL
+    escaped = img_src.replace("'", "\\'")
     b64 = driver.execute_script(f"""
         return new Promise(resolve => {{
             const img = Array.from(document.querySelectorAll('img'))
-                .find(i => i.src === '{img_src}');
+                .find(i => i.src === '{escaped}' || i.currentSrc === '{escaped}');
             if (!img) {{ resolve(null); return; }}
             const c = document.createElement('canvas');
             c.width  = img.naturalWidth  || img.offsetWidth  || 1024;
@@ -558,7 +564,6 @@ def process(jewel_path, tag_path, bg_path, category="earrings",
         data = _b64.b64decode(b64)
         with open(out, "wb") as f: f.write(data)
         _status(f"{tag}✓ {label} saved via canvas ({len(data)//1024}KB)")
-        _delete_chat(driver, _current_chat_url)
         return {"label": label, "output": out, "error": None}
 
     # Method C: browser fetch
@@ -569,16 +574,16 @@ def process(jewel_path, tag_path, bg_path, category="earrings",
                 .then(b=>{const fr=new FileReader();
                           fr.onload=()=>resolve(fr.result);
                           fr.readAsDataURL(b);})
-                .catch(e=>resolve(null));
+                .catch(()=>resolve(null));
         });
     """, img_src)
     if b64 and b64.startswith("data:image"):
         data = _b64.b64decode(b64.split(",", 1)[1])
         with open(out, "wb") as f: f.write(data)
         _status(f"{tag}✓ {label} saved via fetch ({len(data)//1024}KB)")
-        _delete_chat(driver, _current_chat_url)
         return {"label": label, "output": out, "error": None}
 
-    return {"label": label, "output": None, "error": "Gemini: all download methods failed"}
+    return {"label": label, "output": None,
+            "error": f"Gemini: all download methods failed for {img_src[:60]}"}
 
     return {"label": label, "output": None, "error": "Gemini: all download methods failed"}

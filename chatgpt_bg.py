@@ -1420,40 +1420,51 @@ def process(jewel_path, tag_path, bg_path, is_first=False, category="jewellery",
                         pass
 
             # Only consider images that didn't exist before the prompt was sent
+            # Skip patterns: extension logos, CDN icons, known non-content URLs
+            _SKIP = ("chrome-extension://", "extension://", "canva.com", "canva.cn",
+                     "svg", "favicon", "avatar", "logo", "icon", "emoji",
+                     "google.com/favicon", "gstatic.com/images")
+
             new_imgs = []
             for el in all_imgs:
                 try:
                     s = el.get_attribute("src") or el.get_attribute("currentSrc") or ""
-                    if s and s not in _existing_srcs:
-                        new_imgs.append((s, el))
+                    if not s or s in _existing_srcs:
+                        continue
+                    if any(skip in s.lower() for skip in _SKIP):
+                        continue
+                    new_imgs.append((s, el))
                 except Exception:
                     pass
 
-            # Priority 1: new oaiusercontent URL (generated image CDN)
+            # Priority 1: oaiusercontent CDN — ChatGPT generated images always served from here
             for s, el in new_imgs:
                 if "oaiusercontent" in s or "files.openai" in s:
                     img_src = s
-                    _status(f"{tag}🖼️ New oaiusercontent after {tick}s: {s[:100]}")
+                    _status(f"{tag}🖼️ oaiusercontent at {tick}s: {s[:100]}")
                     break
             if img_src:
                 break
 
-            # Priority 2: largest NEW image rendered > 200px
+            # Priority 2: largest new image with reasonable aspect ratio (not a circle logo)
             best_src, best_area = None, 0
             for s, el in new_imgs:
-                if not s or "svg" in s or "favicon" in s or "avatar" in s:
-                    continue
                 try:
                     sz = el.size
                     w, h = sz.get("width", 0), sz.get("height", 0)
-                    if w > 200 and h > 200 and w * h > best_area:
+                    if w < 200 or h < 200:
+                        continue
+                    ratio = w / (h or 1)
+                    if ratio < 0.5 or ratio > 2.0:
+                        continue   # skip very tall/wide banners and circular icons
+                    if w * h > best_area:
                         best_area = w * h
                         best_src = s
                 except Exception:
                     pass
             if best_src:
                 img_src = best_src
-                _status(f"{tag}🖼️ Largest new img after {tick}s ({best_area}px²): {best_src[:100]}")
+                _status(f"{tag}🖼️ Largest img at {tick}s ({best_area}px²): {best_src[:100]}")
                 break
 
         except Exception as e:

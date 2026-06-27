@@ -430,31 +430,25 @@ def process(jewel_path, tag_path, bg_path, category="earrings",
 
     _status(f"{tag}  {pasted_count}/3 images injected")
 
-    # ── 4. Paste prompt text ─────────────────────────────────────────────────
+    # ── 4. Type prompt via execCommand (confirmed working from DOM diagnostic) ──
     _filename = os.path.splitext(os.path.basename(jewel_path))[0]
     _jid = job_id or re.sub(r"[^A-Za-z0-9]", "", _filename)[:12]
     prompt = build_prompt(category, _jid, filename=_filename)
 
-    # Keep focus and paste text
-    input_el.click()
-    time.sleep(0.3)
-    pyperclip.copy(prompt)
-    time.sleep(0.2)
-    ActionChains(driver).key_down(Keys.CONTROL).send_keys('v').key_up(Keys.CONTROL).perform()
-    time.sleep(0.5)
+    typed = driver.execute_script("""
+        const editor = document.querySelector('rich-textarea .ql-editor');
+        if (!editor) return false;
+        editor.focus();
+        return document.execCommand('insertText', false, arguments[0]);
+    """, prompt)
+    time.sleep(0.4)
 
-    # Verify prompt appeared
-    txt_check = driver.execute_script("""
-        const rt = document.querySelector('rich-textarea');
-        return rt ? rt.innerText : '';
-    """) or ""
-    if len(txt_check.strip()) < 10:
-        _status(f"{tag}  ⚠ Prompt not visible — trying send_keys")
+    if not typed:
         input_el.click()
         input_el.send_keys(prompt)
         time.sleep(0.3)
 
-    _status(f"{tag}📝 {pasted_count}/3 images + prompt ready — sending now")
+    _status(f"{tag}📝 Prompt typed — {pasted_count}/3 images + prompt ready")
 
     # ── 5. Snapshot all current images BEFORE sending ─────────────────────────
     pre_srcs = set()

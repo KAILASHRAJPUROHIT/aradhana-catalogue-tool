@@ -264,10 +264,16 @@
     <div class="card-title"><span class="num">5</span> PROCESS</div>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
       <button class="btn btn-gold btn-big" id="runBtn" onclick="runChatGPT()" style="flex:1">
-        &#9654; Process with ChatGPT
+        &#9654; ChatGPT
+      </button>
+      <button class="btn btn-outline btn-big" id="geminiBtn" onclick="runGemini()" style="flex:1;border-color:#4285f4;color:#4285f4">
+        &#9654; Gemini
+      </button>
+      <button class="btn btn-outline btn-big" id="parallelBtn" onclick="runParallel()" style="flex:1;border-color:#a371f7;color:#a371f7">
+        &#9654;&#9654; Both
       </button>
       <button class="btn btn-outline btn-big" id="psBtn" onclick="runPhotoshop()" style="flex:1">
-        &#9654; Process with Photoshop
+        &#9654; Photoshop
       </button>
       <button class="btn btn-outline" onclick="newChat()" title="Force a fresh ChatGPT conversation" style="padding:13px 16px;font-size:13px">
         &#x1F504; New Chat

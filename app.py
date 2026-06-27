@@ -777,6 +777,92 @@ def api_parallel_run():
     return jsonify({"started": True, "pairs": len(pairs)})
 
 
+# ── Quality comparison test ───────────────────────────────────────────────────
+
+COMPARE_RESULT = {"running": False, "chatgpt": None, "gemini": None, "error": None}
+
+@app.route("/api/compare_test", methods=["POST"])
+def api_compare_test():
+    """Run the SAME first pair through both engines simultaneously."""
+    if COMPARE_RESULT["running"]:
+        return jsonify({"error": "Already running"}), 400
+
+    data     = request.json or {}
+    category = data.get("category", "earrings")
+    bg_name  = data.get("bg", "")
+
+    pairs = _derive_pairs_from_disk()
+    if not pairs:
+        return jsonify({"error": "No pairs found — stage a pair first"}), 400
+
+    pair = pairs[0]   # always test the first pair
+    folder = pair.get("folder") or (PROCESSING if pair.get("staged") else INPUT)
+    jewel  = os.path.join(folder, pair["jewel"])
+    tag    = os.path.join(folder, pair["tag"]) if pair.get("tag") else jewel
+
+    if bg_name and not bg_name.endswith(".png"):
+        bg_name += ".png"
+    bg_path = os.path.join(BACKGROUNDS_DIR, bg_name) if bg_name else None
+    if not bg_path or not os.path.exists(bg_path):
+        bg_path = os.path.join(BACKGROUNDS_DIR, f"{category}.png")
+    if not os.path.exists(bg_path):
+        bgs = [f for f in os.listdir(BACKGROUNDS_DIR) if f.endswith(".png")]
+        bg_path = os.path.join(BACKGROUNDS_DIR, bgs[0]) if bgs else None
+
+    COMPARE_RESULT.update({"running": True, "chatgpt": None, "gemini": None, "error": None})
+
+    def _run_cgpt():
+        r = chatgpt_bg.process(
+            jewel_path=jewel, tag_path=tag, bg_path=bg_path,
+            category=category, pair_num="test/cgpt", job_id="COMPARE_TEST"
+        )
+        COMPARE_RESULT["chatgpt"] = r
+        _check_done()
+
+    def _run_gem():
+        r = gemini_bg.process(
+            jewel_path=jewel, tag_path=tag, bg_path=bg_path,
+            category=category, pair_num="test/gem", job_id="COMPARE_TEST"
+        )
+        COMPARE_RESULT["gemini"] = r
+        _check_done()
+
+    def _check_done():
+        if COMPARE_RESULT["chatgpt"] is not None and COMPARE_RESULT["gemini"] is not None:
+            COMPARE_RESULT["running"] = False
+
+    threading.Thread(target=_run_cgpt, daemon=True).start()
+    threading.Thread(target=_run_gem,  daemon=True).start()
+
+    return jsonify({"started": True, "pair": pair["jewel"]})
+
+
+@app.route("/api/compare_progress")
+def api_compare_progress():
+    c = COMPARE_RESULT
+    cgpt_out = c["chatgpt"].get("output") if c["chatgpt"] else None
+    gem_out  = c["gemini"].get("output")  if c["gemini"]  else None
+    return jsonify({
+        "running":        c["running"],
+        "chatgpt_done":   c["chatgpt"] is not None,
+        "gemini_done":    c["gemini"]  is not None,
+        "chatgpt_output": cgpt_out,
+        "chatgpt_error":  c["chatgpt"].get("error") if c["chatgpt"] else None,
+        "gemini_output":  gem_out,
+        "gemini_error":   c["gemini"].get("error")  if c["gemini"]  else None,
+    })
+
+
+@app.route("/img/compare/<path:filename>")
+def serve_compare_img(filename):
+    from flask import send_file
+    # serve directly from output folder
+    full = os.path.join(OUTPUT, filename)
+    if os.path.exists(full):
+        return send_file(full)
+    return "not found", 404
+
+
 # ── launch ────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":

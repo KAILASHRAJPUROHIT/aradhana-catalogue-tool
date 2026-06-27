@@ -530,15 +530,47 @@ def process(jewel_path, tag_path, bg_path, category="earrings",
 
     # Push Chrome to background
     _chrome_to_background()
-    _status(f"{tag}⏳ Prompt sent — watching Gemini stop button")
+    _status(f"{tag}⏳ Prompt sent — Gemini generating")
     time.sleep(1)
 
     label = None
 
-    # Wait for generation
-    gen_status = _wait_for_generation(driver, time.time() + 420, tag)
-    if gen_status == "deadline":
-        return {"label": label, "output": None, "error": f"Gemini timed out"}
+    def _quick_scan_for_image(timeout=15):
+        """
+        Fast-path scan: Gemini often completes in 3-8 seconds.
+        Polls every second for a new image before falling back to stop-button watch.
+        """
+        for t in range(timeout):
+            time.sleep(1)
+            try:
+                driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                all_imgs = driver.find_elements(By.TAG_NAME, "img")
+                for el in all_imgs:
+                    try:
+                        s = el.get_attribute("src") or el.get_attribute("currentSrc") or ""
+                        if not s or s in _existing_srcs:
+                            continue
+                        sz = el.size
+                        w, h = sz.get("width", 0), sz.get("height", 0)
+                        if w > 100 and h > 100:
+                            _status(f"{tag}⚡ Fast image found at {t}s: {s[:80]}")
+                            return s
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+        return None
+
+    # Fast path — check if Gemini already finished (it's often done in <10s)
+    fast_result = _quick_scan_for_image(timeout=12)
+    if fast_result:
+        img_src = fast_result
+    else:
+        # Full stop-button watch for slower responses
+        gen_status = _wait_for_generation(driver, time.time() + 420, tag)
+        if gen_status == "deadline":
+            return {"label": label, "output": None, "error": "Gemini timed out"}
+        img_src = None   # will be set in scan loop below
 
     # Check for error response
     time.sleep(2)

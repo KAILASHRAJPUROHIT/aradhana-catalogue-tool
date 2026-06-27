@@ -433,35 +433,19 @@ def _copy_image_to_clipboard(img_path):
 def _upload_with_verify(driver, wait, files, tag=""):
     """
     Paste images into ChatGPT via clipboard (Ctrl+V) — one at a time.
-    Avoids file input lookups, dedup warnings, and popup dialogs entirely.
+    Uses _wait_for_input_ready so we never start before the input is live.
     """
     files = files[:3]
 
-    # Find the ChatGPT input box
-    input_el = None
-    for sel in ['div#prompt-textarea', 'div[contenteditable="true"]',
-                '#prompt-textarea', 'textarea']:
-        try:
-            els = driver.find_elements(By.CSS_SELECTOR, sel)
-            for el in els:
-                if el.is_displayed():
-                    input_el = el
-                    break
-            if input_el:
-                break
-        except Exception:
-            pass
+    # Use the same ready-check used for prompt typing — confirmed selector div#prompt-textarea
+    try:
+        input_el = _wait_for_input_ready(driver, wait, tag)
+    except TimeoutError:
+        input_el = None
 
     if not input_el:
-        # Fallback to old file-input method if clipboard approach can't find input
-        _status(f"{tag}⚠ Input not found — falling back to file input")
-        try:
-            fi = wait.until(EC.presence_of_element_located(
-                (By.CSS_SELECTOR, 'input[type="file"]')))
-            for f in files:
-                fi.send_keys(f)
-                time.sleep(1)
-        except Exception as e:
+        _status(f"{tag}⚠ Input not found after 15s — skipping image upload")
+        return
             _status(f"{tag}⚠ File input fallback failed: {e}")
         return
 

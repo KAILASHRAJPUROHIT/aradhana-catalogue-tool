@@ -582,10 +582,12 @@ def process(jewel_path, tag_path, bg_path, category="earrings",
         pass
 
     # Scan for new image (same approach as ChatGPT)
-    _status(f"{tag}🔍 Scanning for generated image…")
-    img_src = None
+    if not img_src:
+        _status(f"{tag}🔍 Scanning for generated image…")
 
     for tick in range(90):
+        if img_src:
+            break
         try:
             driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
             time.sleep(0.3)

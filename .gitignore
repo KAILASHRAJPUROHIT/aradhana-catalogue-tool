@@ -54,3 +54,11 @@ Thumbs.db
 Pair/
 tap/
 .agents/
+_diag_*.py
+_cal*.py
+_watch*.py
+_fix_*.py
+_switch_*.py
+_test_*.py
+_gemini_calibration.png
+_cal_with_text.png

@@ -711,6 +711,15 @@ def api_ps_progress():
                     "results": j["results"], "error": j["error"]})
 
 
+@app.route("/api/stop", methods=["POST"])
+def api_stop():
+    CGPT_JOB["running"]   = False
+    CGPT_JOB["current"]   = "⏹ Stopped by user"
+    GEMINI_JOB["running"] = False
+    GEMINI_JOB["current"] = "idle"
+    return jsonify({"ok": True})
+
+
 @app.route("/api/new_chat", methods=["POST"])
 def api_new_chat():
     cfg = os.path.join(BASE, "chatgpt_config.json")

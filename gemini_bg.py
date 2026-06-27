@@ -48,7 +48,7 @@ def _safe_js(driver, script, timeout=5):
             return None
 
 def _ensure_chrome2():
-    """Launch Gemini-dedicated Chrome on port 9223. Opens directly on gemini.google.com."""
+    """Launch Gemini-dedicated Chrome on port 9223, then move it to catalogue desktop."""
     import socket as _s, subprocess
     try:
         c = _s.create_connection(("127.0.0.1", PORT2), timeout=2)
@@ -64,9 +64,14 @@ def _ensure_chrome2():
         f"--user-data-dir={CHROME2}",
         "--no-first-run", "--no-default-browser-check",
         "--homepage=https://gemini.google.com/app",
-        "https://gemini.google.com/app",    # opens this URL on launch
+        "https://gemini.google.com/app",
     ])
     time.sleep(6)
+    try:
+        import vdesk
+        vdesk.push_chrome_to_catalogue_desktop()
+    except Exception as e:
+        _status(f"vdesk: {e}")
     return False
 
 def connect():

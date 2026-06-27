@@ -13,7 +13,7 @@ import os, json, time, datetime
 
 DB_PATH   = os.path.join(os.path.dirname(__file__), "catalogue_db.json")
 KEEP_DAYS = 30
-HASH_DIST_THRESHOLD = 8   # phash Hamming distance — ≤8 = same design
+HASH_DIST_THRESHOLD = 12  # phash pre-filter only — Gemma does final confirm
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
 

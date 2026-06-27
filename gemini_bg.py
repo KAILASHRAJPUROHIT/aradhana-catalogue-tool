@@ -370,29 +370,78 @@ def process(jewel_path, tag_path, bg_path, category="earrings",
     if not input_el:
         return {"label": None, "output": None, "error": "Gemini: input not ready"}
 
-    # ── 3. Paste 3 images via clipboard one by one ────────────────────────────
-    _status(f"{tag}📋 Pasting 3 images")
+    # ── 3. Paste 3 images one by one, verify each before moving on ───────────
+    _status(f"{tag}📋 Pasting 3 images — waiting for each thumbnail")
     input_el.click()
-    time.sleep(0.3)
+    time.sleep(0.5)
 
+    def _count_thumbnails():
+        """Count image thumbnails currently visible in the Gemini input area."""
+        try:
+            return driver.execute_script("""
+                // Thumbnails appear as img tags inside the input container
+                const input = document.querySelector('rich-textarea') ||
+                              document.querySelector('[class*="input"]');
+                if (!input) return 0;
+                return input.querySelectorAll('img').length;
+            """) or 0
+        except Exception:
+            return 0
+
+    pasted_count = 0
     for idx, img_path in enumerate([jewel_path, tag_path, bg_path], 1):
+        before = _count_thumbnails()
         _copy_img_clipboard(img_path)
-        time.sleep(0.3)
+        time.sleep(0.4)
+
+        # Keep focus on input and paste
+        input_el.click()
+        time.sleep(0.2)
         ActionChains(driver).key_down(Keys.CONTROL).send_keys('v').key_up(Keys.CONTROL).perform()
-        time.sleep(0.8)
-        _status(f"{tag}  image {idx}/3 pasted")
+
+        # Wait up to 5s for the thumbnail to appear
+        for _ in range(10):
+            time.sleep(0.5)
+            after = _count_thumbnails()
+            if after > before:
+                pasted_count += 1
+                _status(f"{tag}  ✓ image {idx}/3 confirmed ({after} thumbnails)")
+                break
+        else:
+            _status(f"{tag}  ⚠ image {idx}/3 thumbnail not confirmed — continuing")
+
+        time.sleep(0.3)
+
+    if pasted_count < 3:
+        _status(f"{tag}  ⚠ Only {pasted_count}/3 images confirmed — still sending")
 
     # ── 4. Paste prompt text ─────────────────────────────────────────────────
     _filename = os.path.splitext(os.path.basename(jewel_path))[0]
     _jid = job_id or re.sub(r"[^A-Za-z0-9]", "", _filename)[:12]
     prompt = build_prompt(category, _jid, filename=_filename)
+
+    # Keep focus and paste text
+    input_el.click()
+    time.sleep(0.3)
     pyperclip.copy(prompt)
     time.sleep(0.2)
     ActionChains(driver).key_down(Keys.CONTROL).send_keys('v').key_up(Keys.CONTROL).perform()
-    time.sleep(0.4)
-    _status(f"{tag}📝 Prompt pasted")
+    time.sleep(0.5)
 
-    # ── 5. Snapshot all current images (thumbnails we just pasted) ────────────
+    # Verify prompt appeared
+    txt_check = driver.execute_script("""
+        const rt = document.querySelector('rich-textarea');
+        return rt ? rt.innerText : '';
+    """) or ""
+    if len(txt_check.strip()) < 10:
+        _status(f"{tag}  ⚠ Prompt not visible — trying send_keys")
+        input_el.click()
+        input_el.send_keys(prompt)
+        time.sleep(0.3)
+
+    _status(f"{tag}📝 {pasted_count}/3 images + prompt ready — sending now")
+
+    # ── 5. Snapshot all current images BEFORE sending ─────────────────────────
     pre_srcs = set()
     try:
         pre_srcs = set(driver.execute_script(
@@ -402,7 +451,8 @@ def process(jewel_path, tag_path, bg_path, category="earrings",
     except Exception:
         pass
 
-    # ── 6. Send ───────────────────────────────────────────────────────────────
+    # ── 6. ONLY NOW send — after all images + prompt confirmed ────────────────
+    time.sleep(0.3)   # brief pause to make sure Gemini has processed everything
     sent = driver.execute_script("""
         const btn = Array.from(document.querySelectorAll('button')).find(b =>
             /send/i.test(b.getAttribute('aria-label') || b.title || ''));
@@ -411,7 +461,7 @@ def process(jewel_path, tag_path, bg_path, category="earrings",
     """)
     if not sent:
         input_el.send_keys(Keys.RETURN)
-    _status(f"{tag}📤 Sent — watching for image every second")
+    _status(f"{tag}📤 Sent — polling every second for result")
 
     # Save chat URL for later deletion
     time.sleep(1)

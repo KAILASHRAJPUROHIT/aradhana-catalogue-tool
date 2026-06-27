@@ -573,8 +573,11 @@ async function pollProgress() {
 
   const pct = j.total > 0 ? Math.round((j.done / j.total) * 100) : 0;
   document.getElementById('progressFill').style.width = pct + '%';
-  const curText = j.gemini_current && j.gemini_current !== 'idle' && j.gemini_current !== 'done'
-    ? `ChatGPT: ${j.current || ''} | Gemini: ${j.gemini_current}`
+  const cgptActive   = j.current && j.current !== 'done' && j.current !== '';
+  const geminiActive = j.gemini_current && j.gemini_current !== 'idle' && j.gemini_current !== 'done';
+  const curText = cgptActive && geminiActive
+    ? `ChatGPT: ${j.current} | Gemini: ${j.gemini_current}`
+    : geminiActive ? `Gemini: ${j.gemini_current}`
     : (j.current || '');
   document.getElementById('statusCur').textContent   = curText;
   document.getElementById('statusCount').textContent = `${j.done}/${j.total} · ${pct}%`;

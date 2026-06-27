@@ -237,50 +237,48 @@ PROMPT = build_prompt("jewellery", "INIT")
 _CATALOGUE_CHROME_PID = None   # kept for reference, not used for window finding
 
 
-def _find_catalogue_hwnds():
-    """
-    Find catalogue Chrome windows by page title — much more reliable than PID
-    since Chrome windows are owned by child processes, not the parent.
-    Targets only ChatGPT/chatgpt.com windows — never the user's personal Chrome.
-    """
-    import ctypes, ctypes.wintypes
-    u32   = ctypes.windll.user32
-    found = []
-
-    def _cb(hwnd, _):
-        if not u32.IsWindowVisible(hwnd):
-            return True
-        buf = ctypes.create_unicode_buffer(512)
-        u32.GetWindowTextW(hwnd, buf, 512)
-        t = buf.value.lower()
-        # Only match windows that are on the ChatGPT domain
-        if "chatgpt" in t or "chatgpt.com" in t:
-            found.append(hwnd)
-        return True
-
-    CB = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.wintypes.HWND, ctypes.wintypes.LPARAM)
-    u32.EnumWindows(CB(_cb), 0)
-    return found
-
-
 def _chrome_to_background():
-    """Move Chrome back off-screen after login is done."""
-    try:
-        import ctypes
-        u32 = ctypes.windll.user32
-        for hwnd in _find_catalogue_hwnds():
-            u32.SetWindowPos(hwnd, 0, -32000, -32000, 1280, 900, 0x0010)
-    except Exception:
-        pass
+    """No-op — Chrome stays off-screen via --window-position=-32000,-32000 launch flag."""
+    pass
 
 
 def _chrome_to_foreground():
-    """Move Chrome ON-screen so user can log in, then it goes back off-screen after."""
+    """
+    Move ONLY our catalogue Chrome on-screen for login.
+    Uses user-data-dir path in process cmdline — never touches personal Chrome.
+    """
     try:
-        import ctypes
+        import ctypes, psutil
         u32 = ctypes.windll.user32
-        for hwnd in _find_catalogue_hwnds():
-            u32.SetWindowPos(hwnd, 0, 100, 100, 1280, 900, 0x0010)  # move on-screen
+
+        # Find all PIDs of Chrome processes that use our specific profile
+        our_pids = set()
+        for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+            try:
+                if 'chrome' in (proc.info['name'] or '').lower():
+                    cmd = ' '.join(proc.info['cmdline'] or [])
+                    if 'AutoCatalogueChrome' in cmd:
+                        our_pids.add(proc.info['pid'])
+            except Exception:
+                pass
+
+        if not our_pids:
+            return
+
+        # Find windows belonging to those specific PIDs
+        found = []
+        def _cb(hwnd, _):
+            pid = ctypes.wintypes.DWORD(0)
+            u32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+            if pid.value in our_pids:
+                found.append(hwnd)
+            return True
+        CB = ctypes.WINFUNCTYPE(ctypes.c_bool,
+                                ctypes.wintypes.HWND, ctypes.wintypes.LPARAM)
+        u32.EnumWindows(CB(_cb), 0)
+
+        for hwnd in found:
+            u32.SetWindowPos(hwnd, 0, 100, 100, 1280, 900, 0x0010)
             u32.ShowWindow(hwnd, 9)
             u32.SetForegroundWindow(hwnd)
     except Exception:

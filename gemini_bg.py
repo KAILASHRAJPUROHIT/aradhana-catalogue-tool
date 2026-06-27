@@ -563,17 +563,42 @@ def process(jewel_path, tag_path, bg_path, category="earrings",
     if not img_src:
         return {"label": None, "output": None, "error": "Gemini: image not found in 2 minutes"}
 
-    # ── 8. Read label from response ───────────────────────────────────────────
-    try:
-        txt = driver.execute_script("return document.body.innerText;") or ""
-        # No re.I — tag codes are uppercase (e.g. TP22/157). Lowercase prose like
-        # "followed" or "placed" must not match.
-        m = re.search(r"LABEL[:\s]+([A-Z][A-Z0-9/_-]{1,18})", txt)
-        if m and " " not in m.group(1):
-            label = m.group(1).strip()
-            _status(f"{tag}🏷️ {label}")
-    except Exception:
-        pass
+    # ── 8. Read label — wait up to 10s for Gemini's text response ────────────
+    # Image often appears before the LABEL text — give it a moment
+    for _ in range(10):
+        try:
+            txt = driver.execute_script("return document.body.innerText;") or ""
+            m = re.search(r"LABEL[:\s]+([A-Z][A-Z0-9/_-]{1,18})", txt)
+            if m and " " not in m.group(1):
+                label = m.group(1).strip()
+                _status(f"{tag}🏷️ {label}")
+                break
+        except Exception:
+            pass
+        time.sleep(1)
+
+    if not label:
+        # Fallback: Gemma reads the tag image
+        try:
+            from google import genai
+            from google.genai import types as gt
+            from PIL import Image as _PI
+            import io as _io
+            from keys import GEMINI_API_KEY
+            client = genai.Client(api_key=GEMINI_API_KEY)
+            pil = _PI.open(tag_path).convert("RGB")
+            pil.thumbnail((512, 512))
+            buf = _io.BytesIO(); pil.save(buf, "JPEG", quality=90)
+            resp = client.models.generate_content(
+                model="gemma-4-31b-it",
+                contents=[gt.Part.from_bytes(data=buf.getvalue(), mime_type="image/jpeg"),
+                          "Read the item code on the FIRST LINE of this price tag. Reply ONLY the code. Example: TP22/157"])
+            raw = re.sub(r"[^\w/_-]", "", resp.text.strip().split()[0])[:20]
+            if len(raw) >= 2:
+                label = raw
+                _status(f"{tag}🏷️ Gemma: {label}")
+        except Exception as e:
+            _status(f"{tag}  label fallback failed: {e}")
 
     # ── 9. Download the image ─────────────────────────────────────────────────
     safe = re.sub(r'[/\\:*?"<>|]', '_', label or "studio")

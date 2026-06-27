@@ -358,67 +358,119 @@ def process(jewel_path, tag_path, bg_path, category="earrings",
 
     _status(f"{tag}📎 Uploading images to Gemini")
 
+    # ── Shadow DOM helpers ────────────────────────────────────────────────────
+    _SHADOW_FIND_INPUT = """
+        function findAll(root, sel) {
+            let results = Array.from(root.querySelectorAll(sel));
+            root.querySelectorAll('*').forEach(el => {
+                if (el.shadowRoot) results = results.concat(findAll(el.shadowRoot, sel));
+            });
+            return results;
+        }
+        return findAll(document, 'input[type="file"]');
+    """
+
+    _SHADOW_FIND_IMGS = """
+        function findAllImgs(root) {
+            let imgs = Array.from(root.querySelectorAll('img'));
+            root.querySelectorAll('*').forEach(el => {
+                if (el.shadowRoot) imgs = imgs.concat(findAllImgs(el.shadowRoot));
+            });
+            return imgs.map(i => ({
+                src: i.src || i.currentSrc || i.getAttribute('src') || '',
+                w: i.offsetWidth || i.naturalWidth || 0,
+                h: i.offsetHeight || i.naturalHeight || 0,
+                el: i
+            }));
+        }
+        return findAllImgs(document);
+    """
+
     try:
-        # ── Step 1: Upload files ──────────────────────────────────────────
-        # Gemini's + button opens a menu → click "Upload file" → file input appears
         all_paths = "\n".join(os.path.abspath(f) for f in files)
 
         def _try_file_input():
-            """Find any file input and send paths. Returns True on success."""
-            inputs = driver.find_elements(By.CSS_SELECTOR, 'input[type="file"]')
-            for fi in inputs:
-                try:
-                    driver.execute_script("""
-                        arguments[0].style.cssText =
-                            'display:block!important;visibility:visible!important;opacity:1!important;';
-                    """, fi)
-                    fi.send_keys(all_paths)
-                    return True
-                except Exception:
-                    continue
+            """Find file input including inside shadow DOM and send paths."""
+            try:
+                file_inputs = driver.execute_script(_SHADOW_FIND_INPUT)
+                for fi in (file_inputs or []):
+                    try:
+                        driver.execute_script("""
+                            arguments[0].style.cssText =
+                                'display:block!important;visibility:visible!important;';
+                        """, fi)
+                        fi.send_keys(all_paths)
+                        return True
+                    except Exception:
+                        pass
+            except Exception:
+                pass
             return False
 
         uploaded = False
 
-        # Method 1: direct file input (sometimes already accessible)
+        # Method 1: direct shadow-DOM search for file input
         if _try_file_input():
             uploaded = True
-            _status(f"{tag}  files uploaded via direct input")
+            _status(f"{tag}✅ Files uploaded (shadow DOM input)")
             time.sleep(2)
 
         if not uploaded:
-            # Method 2: click + button → wait for menu → click upload option
-            _status(f"{tag}  clicking + to open upload menu")
+            # Method 2: click + button → wait for menu → click upload → find input
+            _status(f"{tag}  clicking + button")
             driver.execute_script("""
-                // + button has aria-label like "Add more" or just shows "+"
-                const btn = Array.from(document.querySelectorAll('button')).find(b => {
-                    const l = (b.getAttribute('aria-label') || b.textContent || '').trim();
-                    return l === '+' || /^add/i.test(l) || /more options/i.test(l);
-                });
+                function findBtn(root) {
+                    const btns = Array.from(root.querySelectorAll('button, [role="button"]'));
+                    const found = btns.find(b => {
+                        const l = (b.getAttribute('aria-label') || b.textContent || '').trim();
+                        return l === '+' || /add (image|file|more)/i.test(l) ||
+                               /more options/i.test(l) || /attach/i.test(l);
+                    });
+                    if (found) return found;
+                    for (const el of root.querySelectorAll('*')) {
+                        if (el.shadowRoot) {
+                            const r = findBtn(el.shadowRoot);
+                            if (r) return r;
+                        }
+                    }
+                    return null;
+                }
+                const btn = findBtn(document);
                 if (btn) btn.click();
             """)
-            time.sleep(1.2)
+            time.sleep(1.5)
 
-            # Click upload/image option in the menu
+            # Click upload/image option in menu
             driver.execute_script("""
-                const items = Array.from(document.querySelectorAll(
-                    '[role="menuitem"], [role="option"], button, li'));
-                const upload = items.find(el => {
-                    const t = (el.textContent || el.getAttribute('aria-label') || '').toLowerCase();
-                    return t.includes('upload') || t.includes('image') || t.includes('photo') ||
-                           t.includes('file') || t.includes('computer');
-                });
-                if (upload) upload.click();
+                function findMenuItem(root) {
+                    const items = Array.from(root.querySelectorAll(
+                        '[role="menuitem"], [role="option"], button, li, a'));
+                    const found = items.find(el => {
+                        const t = (el.textContent || el.getAttribute('aria-label') || '').toLowerCase();
+                        return t.includes('upload') || t.includes('computer') ||
+                               (t.includes('image') && !t.includes('gemini'));
+                    });
+                    if (found) return found;
+                    for (const el of root.querySelectorAll('*')) {
+                        if (el.shadowRoot) {
+                            const r = findMenuItem(el.shadowRoot);
+                            if (r) return r;
+                        }
+                    }
+                    return null;
+                }
+                const item = findMenuItem(document);
+                if (item) item.click();
             """)
             time.sleep(1)
 
             if _try_file_input():
                 uploaded = True
-                _status(f"{tag}  files uploaded via menu")
+                _status(f"{tag}✅ Files uploaded (menu → shadow DOM)")
                 time.sleep(2)
 
         if not uploaded:
-            _status(f"{tag}⚠️ Could not upload files — prompt only")
+            _status(f"{tag}⚠️ File upload failed — sending prompt only")
 
         # ── Step 2: Find the text input ───────────────────────────────────
         # Gemini uses <rich-textarea> web component with inner contenteditable div

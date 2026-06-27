@@ -386,24 +386,33 @@ def _ensure_logged_in(driver) -> bool:
 
 def _wait_for_input_ready(driver, wait, tag=""):
     """
-    Wait until the ChatGPT input box is ready and not disabled.
-    Handles 'Stop generating' state where input is locked.
+    Wait until the ChatGPT input box is ready.
+    Confirmed selector from live DOM: div#prompt-textarea (contenteditable div).
     """
-    for _ in range(20):
+    _INPUT_SELECTORS = [
+        'div#prompt-textarea',
+        '#prompt-textarea',
+        'div[contenteditable="true"][id="prompt-textarea"]',
+        'div[contenteditable="true"]',   # fallback
+    ]
+    for attempt in range(30):
         try:
-            inp = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, 'div.ProseMirror')))
-            # Check if a previous response is still generating (stop button visible)
-            stop_btn = driver.find_elements(By.CSS_SELECTOR, 'button[aria-label*="Stop"]')
-            if stop_btn:
-                _status(f"{tag}⏳ Waiting for previous response to finish")
-                time.sleep(3)
-                continue
-            if inp.get_attribute("contenteditable") == "true":
-                return inp
+            for sel in _INPUT_SELECTORS:
+                els = driver.find_elements(By.CSS_SELECTOR, sel)
+                for el in els:
+                    if el.is_displayed() and el.get_attribute("contenteditable") == "true":
+                        # Make sure no generation is in progress
+                        stop_btn = driver.find_elements(
+                            By.CSS_SELECTOR, 'button[data-testid="stop-button"]')
+                        if stop_btn:
+                            _status(f"{tag}⏳ Waiting for generation to finish…")
+                            time.sleep(2)
+                            break
+                        return el
         except Exception:
             pass
-        time.sleep(1)
-    raise TimeoutError("Input box never became ready")
+        time.sleep(0.5)
+    raise TimeoutError("ChatGPT input box never became ready after 15s")
 
 
 def _copy_image_to_clipboard(img_path):

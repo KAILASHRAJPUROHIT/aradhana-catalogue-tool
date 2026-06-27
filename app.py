@@ -713,6 +713,19 @@ def api_ps_progress():
                     "results": j["results"], "error": j["error"]})
 
 
+ADMIN_PASSWORD = "Aradhana1992"   # change anytime in app.py
+
+@app.route("/api/admin/reset_db", methods=["POST"])
+def api_reset_db():
+    pwd = (request.json or {}).get("password", "")
+    if pwd != ADMIN_PASSWORD:
+        return jsonify({"ok": False, "error": "Wrong password"}), 403
+    db_path = os.path.join(BASE, "catalogue_db.json")
+    if os.path.exists(db_path):
+        os.remove(db_path)
+    return jsonify({"ok": True, "message": "Duplicate history cleared"})
+
+
 @app.route("/api/stop", methods=["POST"])
 def api_stop():
     CGPT_JOB["running"]   = False

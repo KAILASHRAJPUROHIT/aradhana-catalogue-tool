@@ -1027,25 +1027,54 @@ def process(jewel_path, tag_path, bg_path, is_first=False, category="jewellery",
     time.sleep(0.5)
 
     # Wait for input to be ready (not locked by previous generation)
-    _status(f"{tag}✍️ Sending prompt via clipboard paste")
+    _status(f"{tag}✍️ Typing prompt")
     try:
         import pyperclip
         inp = _wait_for_input_ready(driver, wait, tag)
         driver.execute_script("arguments[0].click(); arguments[0].focus();", inp)
         time.sleep(0.3)
-        # Paste prompt via clipboard — avoids character-by-character send_keys slowness
+
+        # Paste prompt — then fire Quill's input event so ChatGPT enables send button
         pyperclip.copy(prompt)
         ActionChains(driver).key_down(Keys.CONTROL).send_keys('v').key_up(Keys.CONTROL).perform()
-        time.sleep(0.5)
-        # Try clicking send button, fall back to Enter
-        sent = driver.execute_script("""
-            const btn = document.querySelector(
-                'button[data-testid="send-button"], button[aria-label*="Send"]');
-            if (btn && !btn.disabled) { btn.click(); return true; }
-            return false;
-        """)
+        time.sleep(0.3)
+
+        # Trigger Quill/React input event so ChatGPT recognises the pasted text
+        driver.execute_script("""
+            const inp = arguments[0];
+            inp.dispatchEvent(new Event('input', {bubbles: true}));
+            inp.dispatchEvent(new Event('change', {bubbles: true}));
+            // Also trigger on parent for React synthetic events
+            const parent = inp.closest('form') || inp.parentElement;
+            if (parent) parent.dispatchEvent(new Event('input', {bubbles: true}));
+        """, inp)
+        time.sleep(0.4)
+
+        # Wait up to 3s for send button to become enabled
+        sent = False
+        for _ in range(6):
+            result = driver.execute_script("""
+                // Confirmed selector from live DOM: data-testid="send-button"
+                const btn = document.querySelector('button[data-testid="send-button"]');
+                if (btn && !btn.disabled) { btn.click(); return 'testid'; }
+                // Fallback: class-based
+                const cls = document.querySelector('button.composer-submit-btn:not([disabled])');
+                if (cls) { cls.click(); return 'class'; }
+                return null;
+            """)
+            if result:
+                _status(f"{tag}📤 Send button clicked ({result})")
+                sent = True
+                break
+            time.sleep(0.5)
+
         if not sent:
+            # Final fallback — focus input and press Enter
+            _status(f"{tag}  send button not found — pressing Enter")
+            driver.execute_script("arguments[0].focus();", inp)
+            time.sleep(0.2)
             inp.send_keys(Keys.RETURN)
+
     except Exception as e:
         _status(f"{tag}⚠️ Prompt send error: {e}")
 

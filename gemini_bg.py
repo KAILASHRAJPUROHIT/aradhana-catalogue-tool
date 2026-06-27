@@ -460,17 +460,24 @@ def process(jewel_path, tag_path, bg_path, category="earrings",
     except Exception:
         pass
 
-    # ── 6. ONLY NOW send — after all images + prompt confirmed ────────────────
-    time.sleep(0.3)   # brief pause to make sure Gemini has processed everything
-    sent = driver.execute_script("""
-        const btn = Array.from(document.querySelectorAll('button')).find(b =>
-            /send/i.test(b.getAttribute('aria-label') || b.title || ''));
-        if (btn && !btn.disabled) { btn.click(); return true; }
-        return false;
-    """)
+    # ── 6. Send — confirmed selector: button[aria-label="Send message"] ──────
+    time.sleep(0.3)
+    # Poll up to 3s for send button to appear (only shows when input has content)
+    sent = False
+    for _ in range(6):
+        result = driver.execute_script("""
+            const btn = document.querySelector('button[aria-label="Send message"]');
+            if (btn && !btn.disabled) { btn.click(); return 'send-message'; }
+            return null;
+        """)
+        if result:
+            sent = True
+            _status(f"{tag}📤 Send button clicked ({result})")
+            break
+        time.sleep(0.5)
     if not sent:
+        _status(f"{tag}  send button not found — pressing Enter")
         input_el.send_keys(Keys.RETURN)
-    _status(f"{tag}📤 Sent — polling every second for result")
 
     # Save chat URL for later deletion
     time.sleep(1)

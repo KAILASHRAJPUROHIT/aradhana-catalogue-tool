@@ -58,7 +58,8 @@ def _ensure_chrome2():
         pass
     _status("🚀 Starting Gemini Chrome (port 9223)…")
     os.makedirs(CHROME2, exist_ok=True)
-    subprocess.Popen([
+    global _GEMINI_CHROME_PID
+    proc = subprocess.Popen([
         r"C:\Program Files\Google\Chrome\Application\chrome.exe",
         f"--remote-debugging-port={PORT2}",
         f"--user-data-dir={CHROME2}",
@@ -66,12 +67,8 @@ def _ensure_chrome2():
         "--homepage=https://gemini.google.com/app",
         "https://gemini.google.com/app",
     ])
+    _GEMINI_CHROME_PID = proc.pid
     time.sleep(6)
-    try:
-        import vdesk
-        vdesk.push_chrome_to_catalogue_desktop()
-    except Exception as e:
-        _status(f"vdesk: {e}")
     return False
 
 def connect():

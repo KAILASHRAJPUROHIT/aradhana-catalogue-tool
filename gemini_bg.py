@@ -413,16 +413,30 @@ def process(jewel_path, tag_path, bg_path, category="earrings",
         win32clipboard.CloseClipboard()
 
     try:
-        # ── Find Gemini's text input ──────────────────────────────────────
+        # ── Find Gemini's text input precisely ───────────────────────────
+        # Gemini's input is inside a <rich-textarea> component at the bottom.
+        # We find the contenteditable div inside it — NOT any div on the page.
         input_el = driver.execute_script("""
+            // 1. rich-textarea custom component (most reliable)
             const rt = document.querySelector('rich-textarea');
             if (rt) {
-                const inner = rt.querySelector('[contenteditable="true"]');
-                if (inner) return inner;
+                const ce = rt.querySelector('[contenteditable="true"]');
+                if (ce) return ce;
             }
+            // 2. Any contenteditable that's inside the input area / footer
+            const footer = document.querySelector(
+                'footer, [class*="input-area"], [class*="chat-input"], ' +
+                '[class*="input-container"], [data-testid*="input"]'
+            );
+            if (footer) {
+                const ce = footer.querySelector('[contenteditable="true"]');
+                if (ce) return ce;
+            }
+            // 3. Last resort: largest visible contenteditable
             return Array.from(document.querySelectorAll('[contenteditable="true"]'))
-                       .find(el => el.offsetParent !== null && el.offsetWidth > 50)
-                   || document.querySelector('textarea');
+                .filter(el => el.offsetParent && el.offsetWidth > 200 &&
+                              el.getBoundingClientRect().top > window.innerHeight * 0.5)
+                .sort((a,b) => b.offsetWidth - a.offsetWidth)[0] || null;
         """)
 
         if not input_el:

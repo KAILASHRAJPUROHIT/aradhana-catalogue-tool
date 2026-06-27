@@ -188,7 +188,7 @@ def _ensure_chrome():
     except OSError:
         pass
     CGPT_JOB["current"] = "🚀 Starting ChatGPT Chrome…"
-    subprocess.Popen([
+    proc = subprocess.Popen([
         r"C:\Program Files\Google\Chrome\Application\chrome.exe",
         "--remote-debugging-port=9222",
         r"--user-data-dir=C:\Users\kaila\AppData\Local\AutoCatalogueChrome",
@@ -197,11 +197,8 @@ def _ensure_chrome():
         "https://chatgpt.com",
     ])
     import time as _t; _t.sleep(6)
-    try:
-        import vdesk
-        vdesk.push_chrome_to_catalogue_desktop()
-    except Exception as e:
-        print(f"vdesk: {e}")
+    # Tell chatgpt_bg which PID is ours so it never touches other Chrome instances
+    chatgpt_bg._CATALOGUE_CHROME_PID = proc.pid
     return False
 
 def _gemma_read_tag(tag_path):

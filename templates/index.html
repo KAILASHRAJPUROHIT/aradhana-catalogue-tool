@@ -442,6 +442,22 @@ function _startProgress(label) {
   document.getElementById('resultsGrid').style.display    = 'none';
 }
 
+async function resetDuplicateDB() {
+  const pwd = prompt('Enter admin password to clear duplicate history:');
+  if (!pwd) return;
+  const r = await fetch('/api/admin/reset_db', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({password: pwd})
+  });
+  const j = await r.json();
+  if (j.ok) {
+    alert('✅ Duplicate history cleared. All images will be treated as new.');
+  } else {
+    alert('❌ ' + (j.error || 'Failed'));
+  }
+}
+
 async function stopRun() {
   await fetch('/api/stop', {method:'POST'});
   document.getElementById('statusCur').textContent = '⏹ Stopping…';

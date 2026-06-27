@@ -207,19 +207,19 @@ def check_and_record(label: str, output_path: str, category: str = "") -> list:
                 g = _gemma_same_design(output_path, e_out)
                 gemma_confirmed_same = g["same"]
                 gemma_reason = g["reason"]
-            # Only flag if Gemma also says designs differ (or Gemma unavailable)
+            # Only flag if Gemma also confirms designs differ (or Gemma unavailable)
             if gemma_confirmed_same is not True:
-            findings.append({
-                "type":    "same_tag_diff_design",
-                "label":   e.get("label"),
-                "date":    e_date,
-                "output":  e_out,
-                "message": (
-                    f"Same tag but different design — "
-                    f"tag '{label}' was used for a visually different item on {e_date}. "
-                    f"Possible tag reuse or data entry error?"
-                )
-            })
+                findings.append({
+                    "type":    "same_tag_diff_design",
+                    "label":   e.get("label"),
+                    "date":    e_date,
+                    "output":  e_out,
+                    "message": (
+                        f"Same tag '{label}' but different design — "
+                        f"previously processed on {e_date}. "
+                        f"Gemma: {gemma_reason or 'designs appear visually different'}"
+                    )
+                })
 
     # Record this entry
     entry = {

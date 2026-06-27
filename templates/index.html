@@ -468,6 +468,21 @@ async function uploadCustomBg(input) {
   }
 }
 
+async function rejectResult(pairNum, sku) {
+  if (!confirm(`Reject pair ${pairNum} (${sku || 'unknown'}) and requeue for reprocessing?`)) return;
+  const r = await fetch('/api/reject', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({pair: pairNum, sku})
+  });
+  const j = await r.json();
+  if (j.ok) {
+    alert(`✓ Pair ${pairNum} queued for reprocessing`);
+  } else {
+    alert('❌ ' + (j.error || 'Failed'));
+  }
+}
+
 async function resetDuplicateDB() {
   const pwd = prompt('Enter admin password to clear duplicate history:');
   if (!pwd) return;

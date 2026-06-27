@@ -475,6 +475,128 @@ def _run_chatgpt_job(pairs, category, bg_name):
     CGPT_JOB["current"] = "done"
 
 
+# ── Gemini parallel runner ────────────────────────────────────────────────────
+
+def _run_gemini_job(pairs, category, bg_name):
+    """Mirror of _run_chatgpt_job but using gemini_bg."""
+    if bg_name and not bg_name.endswith(".png"):
+        bg_name += ".png"
+    bg_path = os.path.join(BACKGROUNDS_DIR, bg_name) if bg_name else None
+    if not bg_path or not os.path.exists(bg_path):
+        bg_path = os.path.join(BACKGROUNDS_DIR, f"{category}.png")
+    if not os.path.exists(bg_path):
+        bgs = [f for f in os.listdir(BACKGROUNDS_DIR) if f.endswith(".png")]
+        bg_path = os.path.join(BACKGROUNDS_DIR, bgs[0]) if bgs else None
+
+    out_dir = os.path.join(OUTPUT, category)
+    os.makedirs(out_dir, exist_ok=True)
+    progress = _load_progress(category)
+    results  = list(GEMINI_JOB.get("results") or [])
+
+    for i, s in enumerate(pairs):
+        pair_key = str(s["pair"])
+        folder   = s.get("folder") or (PROCESSING if s.get("staged") else INPUT)
+        jewel    = os.path.join(folder, s["jewel"])
+        tag      = os.path.join(folder, s["tag"]) if s.get("tag") else None
+
+        if pair_key in progress and progress[pair_key].get("output"):
+            saved = progress[pair_key]
+            results.append({"pair": s["pair"], "sku": saved["label"],
+                            "output": saved["output"], "error": None,
+                            "engine": "gemini", "skipped": True})
+            GEMINI_JOB["done"]    = i + 1
+            GEMINI_JOB["results"] = results
+            continue
+
+        # Gemma label in background
+        gemma_label = {"value": ""}
+        def _bg_g(tp=tag, gl=gemma_label):
+            if tp and os.path.exists(tp):
+                gl["value"] = _gemma_read_tag(tp)
+        gt = threading.Thread(target=_bg_g, daemon=True)
+        gt.start()
+
+        result = {"error": "not started"}
+        for attempt in range(1, 4):
+            if attempt > 1:
+                GEMINI_JOB["current"] = f"🔁 Gemini retry {attempt}/3 · pair {s['pair']}"
+                time.sleep(5)
+            GEMINI_JOB["current"] = f"Gemini · pair {s['pair']} try{attempt}"
+            result = gemini_bg.process(
+                jewel_path=jewel, tag_path=tag or jewel,
+                bg_path=bg_path, category=category,
+                pair_num=f"{i+1}/{len(pairs)} try{attempt}",
+                job_id=s.get("job_id") or f"{i+1:03d}",
+            )
+            if result.get("output") and os.path.exists(result["output"]):
+                break
+
+        gt.join(timeout=30)
+        raw = (result.get("label") or "").strip()
+        placeholders = ["first line", "price tag", "image 2", "[", " "]
+        if raw and not any(p in raw.lower() for p in placeholders) and len(raw) >= 2:
+            label = raw
+        elif gemma_label["value"]:
+            label = gemma_label["value"]
+        else:
+            label = f"AJ-{s['pair']:03d}"
+
+        safe     = re.sub(r'[/\\:*?"<>|]', '_', label)
+        out_path = os.path.join(out_dir, f"{safe}_gemini.jpg")
+
+        if result.get("output") and os.path.exists(result["output"]):
+            os.replace(result["output"], out_path)
+            findings = catalogue_db.check_and_record(label, out_path, category)
+            _save_progress(category, pair_key, label, f"{category}/{safe}_gemini.jpg")
+            if findings:
+                worst = findings[0]["type"]
+                results.append({"pair": s["pair"], "sku": label,
+                                "output": f"{category}/{safe}_gemini.jpg",
+                                "error": None, "engine": "gemini",
+                                "duplicate": True, "duplicate_type": worst,
+                                "duplicate_reason": findings[0]["message"],
+                                "findings": findings})
+            else:
+                results.append({"pair": s["pair"], "sku": label,
+                                "output": f"{category}/{safe}_gemini.jpg",
+                                "error": None, "engine": "gemini"})
+        else:
+            results.append({"pair": s["pair"], "sku": label, "output": None,
+                            "error": result.get("error", "failed"), "engine": "gemini"})
+
+        GEMINI_JOB["done"]    = i + 1
+        GEMINI_JOB["results"] = results
+
+    GEMINI_JOB["running"] = False
+    GEMINI_JOB["current"] = "done"
+
+
+# ── Parallel dispatcher — splits queue between ChatGPT + Gemini ───────────────
+
+def _run_parallel_job(pairs, category, bg_name):
+    """
+    Split pairs across ChatGPT and Gemini engines.
+    Odd pairs → ChatGPT, Even pairs → Gemini.
+    Both run simultaneously in separate threads.
+    """
+    cgpt_pairs   = [p for i, p in enumerate(pairs) if i % 2 == 0]
+    gemini_pairs = [p for i, p in enumerate(pairs) if i % 2 == 1]
+
+    CGPT_JOB.update({"running": True, "total": len(cgpt_pairs), "done": 0,
+                     "results": [], "started": time.time(), "error": None})
+    GEMINI_JOB.update({"running": True, "total": len(gemini_pairs), "done": 0,
+                       "results": [], "started": time.time(), "error": None})
+
+    t1 = threading.Thread(target=_run_chatgpt_job,
+                          args=(cgpt_pairs, category, bg_name), daemon=True)
+    t2 = threading.Thread(target=_run_gemini_job,
+                          args=(gemini_pairs, category, bg_name), daemon=True)
+    t1.start()
+    t2.start()
+    t1.join()
+    t2.join()
+
+
 # ── Photoshop processing ──────────────────────────────────────────────────────
 
 PS_JOB = {

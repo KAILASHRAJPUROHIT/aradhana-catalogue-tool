@@ -389,50 +389,46 @@ def process(jewel_path, tag_path, bg_path, category="earrings",
     if not input_el:
         return {"label": None, "output": None, "error": "Gemini: input not ready"}
 
-    # ── 3. Paste 3 images one by one, verify each before moving on ───────────
-    _status(f"{tag}📋 Pasting 3 images — waiting for each thumbnail")
-    input_el.click()
-    time.sleep(0.5)
+    # ── 3. Inject images via synthetic paste event (bypasses Gemini upload UI) ──
+    # Gemini's upload menu uses Angular Material portals — no accessible file input.
+    # We inject images directly into the Quill editor as ClipboardEvent with File objects.
+    _status(f"{tag}📎 Injecting 3 images into Gemini")
 
-    def _count_thumbnails():
-        """Count image thumbnails currently visible in the Gemini input area."""
-        try:
-            return driver.execute_script("""
-                // Thumbnails appear as img tags inside the input container
-                const input = document.querySelector('rich-textarea') ||
-                              document.querySelector('[class*="input"]');
-                if (!input) return 0;
-                return input.querySelectorAll('img').length;
-            """) or 0
-        except Exception:
-            return 0
+    def _inject_image_js(img_path, idx):
+        import base64 as _b64
+        from PIL import Image as _PIL
+        import io as _io
+        img = _PIL.open(img_path).convert("RGB")
+        img.thumbnail((1024, 1024))
+        buf = _io.BytesIO()
+        img.save(buf, "JPEG", quality=88)
+        b64 = _b64.b64encode(buf.getvalue()).decode()
+        return driver.execute_script("""
+            const b64 = arguments[0], fname = arguments[1];
+            const binary = atob(b64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+            const file = new File([bytes], fname, {type: 'image/jpeg'});
+            const editor = document.querySelector('rich-textarea .ql-editor');
+            if (!editor) return 'no-editor';
+            editor.focus();
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            editor.dispatchEvent(new ClipboardEvent('paste', {
+                bubbles: true, cancelable: true, clipboardData: dt
+            }));
+            return 'ok';
+        """, b64, f"img{idx}.jpg")
 
     pasted_count = 0
     for idx, img_path in enumerate([jewel_path, tag_path, bg_path], 1):
-        before = _count_thumbnails()
-        _copy_img_clipboard(img_path)
-        time.sleep(0.4)
+        res = _inject_image_js(img_path, idx)
+        _status(f"{tag}  image {idx}/3 → {res}")
+        time.sleep(1.0)
+        if res == "ok":
+            pasted_count += 1
 
-        # Keep focus on input and paste
-        input_el.click()
-        time.sleep(0.2)
-        ActionChains(driver).key_down(Keys.CONTROL).send_keys('v').key_up(Keys.CONTROL).perform()
-
-        # Wait up to 5s for the thumbnail to appear
-        for _ in range(10):
-            time.sleep(0.5)
-            after = _count_thumbnails()
-            if after > before:
-                pasted_count += 1
-                _status(f"{tag}  ✓ image {idx}/3 confirmed ({after} thumbnails)")
-                break
-        else:
-            _status(f"{tag}  ⚠ image {idx}/3 thumbnail not confirmed — continuing")
-
-        time.sleep(0.3)
-
-    if pasted_count < 3:
-        _status(f"{tag}  ⚠ Only {pasted_count}/3 images confirmed — still sending")
+    _status(f"{tag}  {pasted_count}/3 images injected")
 
     # ── 4. Paste prompt text ─────────────────────────────────────────────────
     _filename = os.path.splitext(os.path.basename(jewel_path))[0]

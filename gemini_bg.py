@@ -48,7 +48,7 @@ def _safe_js(driver, script, timeout=5):
             return None
 
 def _ensure_chrome2():
-    """Auto-launch second Chrome on port 9223 if not running."""
+    """Launch Gemini-dedicated Chrome on port 9223. Opens directly on gemini.google.com."""
     import socket as _s, subprocess
     try:
         c = _s.create_connection(("127.0.0.1", PORT2), timeout=2)
@@ -62,7 +62,9 @@ def _ensure_chrome2():
         r"C:\Program Files\Google\Chrome\Application\chrome.exe",
         f"--remote-debugging-port={PORT2}",
         f"--user-data-dir={CHROME2}",
-        "--no-first-run", "--no-default-browser-check"
+        "--no-first-run", "--no-default-browser-check",
+        "--homepage=https://gemini.google.com/app",
+        "https://gemini.google.com/app",    # opens this URL on launch
     ])
     time.sleep(6)
     return False

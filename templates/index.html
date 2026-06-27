@@ -415,144 +415,62 @@ async function stageFiles() {
 
 // ── Step 5: Process ───────────────────────────────────────────────────────────
 
-async function runGemini() {
-  const cat = document.getElementById('catSelect').value;
-  if (!cat) { alert('Select ornament type first.'); return; }
-  const bg = document.getElementById('bgSelect')?.value || '';
-  document.getElementById('geminiBtn').disabled = true;
-  document.getElementById('statusCur').textContent = 'Starting Gemini…';
-  await fetch('/api/gemini_run', {method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({category: cat, bg})});
-  if (_polling) clearInterval(_polling);
-  _polling = setInterval(pollChatGPT, 1500);
-}
-
-async function runCompare() {
-  const cat = document.getElementById('catSelect').value;
-  if (!cat) { alert('Select ornament type first.'); return; }
-  const bg = document.getElementById('bgSelect')?.value || '';
-  document.getElementById('compareBtn').disabled = true;
-  document.getElementById('comparePanel').style.display = 'block';
-  document.getElementById('cgptStatus').textContent = '⏳ ChatGPT generating…';
-  document.getElementById('gemStatus').textContent  = '⏳ Gemini generating…';
-  document.getElementById('cgptImg').style.display  = 'none';
-  document.getElementById('gemImg').style.display   = 'none';
-  document.getElementById('cgptErr').style.display  = 'none';
-  document.getElementById('gemErr').style.display   = 'none';
-  await fetch('/api/compare_test', {method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({category: cat, bg})});
-  // Poll for results
-  const poll = setInterval(async () => {
-    const j = await fetch('/api/compare_progress').then(r => r.json());
-    if (j.chatgpt_done) {
-      if (j.chatgpt_output) {
-        document.getElementById('cgptStatus').textContent = '✅ Done';
-        const img = document.getElementById('cgptImg');
-        img.src = '/img/output/' + j.chatgpt_output + '?t=' + Date.now();
-        img.style.display = 'block';
-      } else {
-        document.getElementById('cgptStatus').textContent = '❌ Failed';
-        document.getElementById('cgptErr').textContent = j.chatgpt_error || '';
-        document.getElementById('cgptErr').style.display = 'block';
-      }
-    }
-    if (j.gemini_done) {
-      if (j.gemini_output) {
-        document.getElementById('gemStatus').textContent = '✅ Done';
-        const img = document.getElementById('gemImg');
-        img.src = '/img/output/' + j.gemini_output + '?t=' + Date.now();
-        img.style.display = 'block';
-      } else {
-        document.getElementById('gemStatus').textContent = '❌ Failed';
-        document.getElementById('gemErr').textContent = j.gemini_error || '';
-        document.getElementById('gemErr').style.display = 'block';
-      }
-    }
-    if (!j.running) {
-      clearInterval(poll);
-      document.getElementById('compareBtn').disabled = false;
-    }
-  }, 2000);
-}
-
-async function runParallel() {
-  const cat = document.getElementById('catSelect').value;
-  if (!cat) { alert('Select ornament type first.'); return; }
-  const bg = document.getElementById('bgSelect')?.value || '';
-  document.getElementById('runBtn').disabled = true;
-  document.getElementById('geminiBtn').disabled = true;
-  document.getElementById('parallelBtn').disabled = true;
-  document.getElementById('statusCur').textContent = 'Starting ChatGPT + Gemini…';
-  await fetch('/api/parallel_run', {method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({category: cat, bg})});
-  if (_polling) clearInterval(_polling);
-  _polling = setInterval(pollChatGPT, 1500);
-}
-
-async function newChat() {
-  if (!confirm('Start a fresh ChatGPT conversation? (clears saved chat)')) return;
-  await fetch('/api/new_chat', {method:'POST'});
-  alert('Done — next run will open a brand new chat.');
-}
-
-async function runPhotoshop() {
-  const cat = document.getElementById('catSelect').value;
-  if (!cat) { alert('Select ornament type first.'); return; }
-  const pairs = _staged.length ? _staged : _pairs;
-  if (!pairs.length) { alert('No pairs loaded.'); return; }
-
-  document.getElementById('psBtn').disabled = true;
-  document.getElementById('runBtn').disabled = true;
-  document.getElementById('progressWrap').style.display = 'block';
-  document.getElementById('progressStatus').style.display = 'flex';
-  document.getElementById('statusCur').textContent = 'Starting Photoshop…';
-  document.getElementById('resultsGrid').style.display = 'none';
-
-  await fetch('/api/ps_run', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({pairs, category: cat, bg: _selBg})
+function _setBtns(disabled) {
+  ['runBtn','geminiBtn','parallelBtn'].forEach(id => {
+    document.getElementById(id).disabled = disabled;
   });
+  document.getElementById('stopBtn').style.display = disabled ? 'block' : 'none';
+}
 
-  if (_polling) clearInterval(_polling);
-  _polling = setInterval(async () => {
-    let j;
-    try { j = await fetch('/api/ps_progress').then(x => x.json()); } catch { return; }
-    const pct = j.total > 0 ? Math.round((j.done / j.total) * 100) : 0;
-    document.getElementById('progressFill').style.width = pct + '%';
-    document.getElementById('statusCur').textContent   = j.current || '';
-    document.getElementById('statusCount').textContent = `${j.done}/${j.total} · ${pct}%`;
-    document.getElementById('statusEta').textContent   = j.eta != null ? `ETA ${fmt(j.eta)}` : 'ETA —';
-    document.getElementById('statusElapsed').textContent = `${fmt(j.elapsed)} elapsed`;
-    if (j.results && j.results.length) showResults(j.results);
-    if (!j.running) {
-      clearInterval(_polling); _polling = null;
-      document.getElementById('psBtn').disabled = false;
-      document.getElementById('runBtn').disabled = false;
-      document.getElementById('progressFill').style.width = '100%';
-    }
-  }, 1500);
+function _startProgress(label) {
+  document.getElementById('progressWrap').style.display   = 'block';
+  document.getElementById('progressStatus').style.display = 'flex';
+  document.getElementById('progressFill').style.width     = '0%';
+  document.getElementById('statusCur').textContent        = label;
+  document.getElementById('statusCount').textContent      = '';
+  document.getElementById('statusEta').textContent        = '';
+  document.getElementById('statusElapsed').textContent    = '';
+  document.getElementById('statusSlots').textContent      = '';
+  document.getElementById('resultsGrid').style.display    = 'none';
+}
+
+async function stopRun() {
+  await fetch('/api/stop', {method:'POST'});
+  document.getElementById('statusCur').textContent = '⏹ Stopping…';
 }
 
 async function runChatGPT() {
   const cat = document.getElementById('catSelect').value;
   if (!cat) { alert('Select ornament type first.'); return; }
-
   const pairs = _staged.length ? _staged : _pairs;
-  if (!pairs.length) { alert('No pairs loaded. Load images first.'); return; }
+  if (!pairs.length) { alert('No pairs loaded.'); return; }
+  _setBtns(true);
+  _startProgress('Starting ChatGPT…');
+  await fetch('/api/chatgpt_run', {method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({pairs, category: cat, bg: _selBg})});
+  startPolling();
+}
 
-  document.getElementById('runBtn').disabled = true;
-  document.getElementById('progressWrap').style.display = 'block';
-  document.getElementById('progressStatus').style.display = 'flex';
-  document.getElementById('resultsGrid').style.display = 'none';
+async function runGemini() {
+  const cat = document.getElementById('catSelect').value;
+  if (!cat) { alert('Select ornament type first.'); return; }
+  _setBtns(true);
+  _startProgress('Starting Gemini…');
+  await fetch('/api/gemini_run', {method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({category: cat, bg: _selBg || ''})});
+  startPolling();
+}
 
-  await fetch('/api/chatgpt_run', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({pairs, category: cat, bg: _selBg})
-  });
-
+async function runParallel() {
+  const cat = document.getElementById('catSelect').value;
+  if (!cat) { alert('Select ornament type first.'); return; }
+  _setBtns(true);
+  _startProgress('Starting ChatGPT + Gemini…');
+  await fetch('/api/parallel_run', {method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({category: cat, bg: _selBg || ''})});
   startPolling();
 }
 
@@ -566,32 +484,74 @@ async function pollProgress() {
   try { j = await fetch('/api/chatgpt_progress').then(x => x.json()); }
   catch { return; }
 
-  const pct = j.total > 0 ? Math.round((j.done / j.total) * 100) : 0;
+  const total = j.total || 0;
+  const done  = j.done  || 0;
+  const pct   = total > 0 ? Math.round((done / total) * 100) : 0;
+
   document.getElementById('progressFill').style.width = pct + '%';
-  const cgptActive   = j.current && j.current !== 'done' && j.current !== '';
+
+  const cgptActive   = j.current && j.current !== 'done';
   const geminiActive = j.gemini_current && j.gemini_current !== 'idle' && j.gemini_current !== 'done';
   const curText = cgptActive && geminiActive
     ? `ChatGPT: ${j.current} | Gemini: ${j.gemini_current}`
     : geminiActive ? `Gemini: ${j.gemini_current}`
     : (j.current || '');
-  document.getElementById('statusCur').textContent   = curText;
-  document.getElementById('statusCount').textContent = `${j.done}/${j.total} · ${pct}%`;
 
-  const eta = j.eta != null ? `ETA ${fmt(j.eta)}` : 'ETA —';
-  document.getElementById('statusEta').textContent     = eta;
-  document.getElementById('statusElapsed').textContent = `${fmt(j.elapsed)} elapsed`;
+  document.getElementById('statusCur').textContent      = curText;
+  document.getElementById('statusCount').textContent    = total > 0 ? `${done}/${total} · ${pct}%` : '';
+  document.getElementById('statusEta').textContent      = j.eta != null ? `ETA ${fmt(j.eta)}` : '';
+  document.getElementById('statusElapsed').textContent  = j.elapsed ? `${fmt(j.elapsed)} elapsed` : '';
   if (j.slots) document.getElementById('statusSlots').textContent = j.slots;
 
-  if (j.results && j.results.length) showResults(j.results, j.done, j.total);
+  if (j.results && j.results.length) showResults(j.results, done, total);
 
   if (!j.running) {
     clearInterval(_polling);
     _polling = null;
-    document.getElementById('runBtn').disabled      = false;
-    document.getElementById('geminiBtn').disabled   = false;
-    document.getElementById('parallelBtn').disabled = false;
+    _setBtns(false);
     document.getElementById('progressFill').style.width = '100%';
   }
+}
+
+async function runCompare() {
+  const cat = document.getElementById('catSelect').value;
+  if (!cat) { alert('Select ornament type first.'); return; }
+  _setBtns(true);
+  _startProgress('Running comparison test…');
+  document.getElementById('comparePanel').style.display = 'block';
+  ['cgptStatus','gemStatus'].forEach(id =>
+    document.getElementById(id).textContent = '⏳ Generating…');
+  ['cgptImg','gemImg','cgptErr','gemErr'].forEach(id =>
+    document.getElementById(id).style.display = 'none');
+  await fetch('/api/compare_test', {method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({category: cat, bg: _selBg || ''})});
+  const poll = setInterval(async () => {
+    const j = await fetch('/api/compare_progress').then(r => r.json());
+    if (j.chatgpt_done) {
+      document.getElementById('cgptStatus').textContent = j.chatgpt_output ? '✅ Done' : '❌ Failed';
+      if (j.chatgpt_output) {
+        const img = document.getElementById('cgptImg');
+        img.src = '/img/output/' + j.chatgpt_output + '?t=' + Date.now();
+        img.style.display = 'block';
+      } else {
+        document.getElementById('cgptErr').textContent = j.chatgpt_error || '';
+        document.getElementById('cgptErr').style.display = 'block';
+      }
+    }
+    if (j.gemini_done) {
+      document.getElementById('gemStatus').textContent = j.gemini_output ? '✅ Done' : '❌ Failed';
+      if (j.gemini_output) {
+        const img = document.getElementById('gemImg');
+        img.src = '/img/output/' + j.gemini_output + '?t=' + Date.now();
+        img.style.display = 'block';
+      } else {
+        document.getElementById('gemErr').textContent = j.gemini_error || '';
+        document.getElementById('gemErr').style.display = 'block';
+      }
+    }
+    if (!j.running) { clearInterval(poll); _setBtns(false); }
+  }, 2000);
 }
 
 function fmt(s) {

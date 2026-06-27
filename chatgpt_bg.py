@@ -768,9 +768,9 @@ def _wait_for_generation(driver, deadline, tag=""):
         });
     """
 
-    # Phase 1 — wait up to 45s for stop button to appear
+    # Phase 1 — wait up to 20s for stop button to appear (was 45s — too long if prompt never sent)
     appeared = False
-    appear_by = time.time() + 45
+    appear_by = time.time() + 20
     while time.time() < min(appear_by, deadline):
         time.sleep(1)
         vis = _safe_js(driver, _STOP_JS)

@@ -493,6 +493,7 @@ def _run_chatgpt_job(pairs, category, bg_name):
                     "findings":         findings,
                 })
             else:
+                seen_tags_this_run.add(clean_label)   # mark tag as done this run
                 results.append({"pair": s["pair"], "sku": label,
                                 "output": f"{category}/{safe}.jpg", "error": None})
 

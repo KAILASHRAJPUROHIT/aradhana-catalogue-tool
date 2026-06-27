@@ -276,6 +276,10 @@ def build_prompt(category, job_id, filename=""):
         "6. If a pair: both pieces perfectly straight, symmetrical, evenly spaced. "
         "7. Professional studio lighting on the background from image 3. "
         "8. NO text, numbers, or watermarks anywhere on the output image. "
+        "9. OUTPUT QUALITY: render at maximum resolution — ultra-sharp, crisp edges on every "
+        "detail of the jewellery, deep metallic lustre, gem colours vivid and accurate. "
+        "The final image must look like a professional luxury jewellery photoshoot — "
+        "magazine-grade sharpness, no blur, no soft focus, no noise. "
         f"Reply starting with: JOB:{job_id} LABEL: followed by the actual code from the tag in image 2"
     )
 

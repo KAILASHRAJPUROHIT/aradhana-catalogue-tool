@@ -495,8 +495,11 @@ def process(jewel_path, tag_path, bg_path, category="earrings",
             break
         time.sleep(0.5)
     if not sent:
-        _status(f"{tag}  send button not found — pressing Enter")
-        input_el.send_keys(Keys.RETURN)
+        _status(f"{tag}  fallback — Enter key")
+        driver.execute_cdp_cmd("Input.dispatchKeyEvent",
+                               {"type": "keyDown", "key": "Enter", "code": "Enter"})
+        driver.execute_cdp_cmd("Input.dispatchKeyEvent",
+                               {"type": "keyUp",   "key": "Enter", "code": "Enter"})
 
     # Save chat URL for later deletion
     time.sleep(1)

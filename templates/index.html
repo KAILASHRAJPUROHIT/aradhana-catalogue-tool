@@ -450,6 +450,24 @@ function _startProgress(label) {
   document.getElementById('resultsGrid').style.display    = 'none';
 }
 
+async function uploadCustomBg(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const fd = new FormData();
+  fd.append('file', file);
+  const r = await fetch('/api/upload_bg', {method:'POST', body: fd});
+  const j = await r.json();
+  if (j.ok) {
+    _selBg = j.filename;
+    document.getElementById('bgBrowseInfo').textContent = '✓ ' + j.filename;
+    document.getElementById('bgConfirm').textContent = 'Background: ' + j.filename;
+    // Deselect any grid tile
+    document.querySelectorAll('.bg-tile').forEach(t => t.classList.remove('selected'));
+  } else {
+    document.getElementById('bgBrowseInfo').textContent = '❌ Upload failed';
+  }
+}
+
 async function resetDuplicateDB() {
   const pwd = prompt('Enter admin password to clear duplicate history:');
   if (!pwd) return;

@@ -405,38 +405,73 @@ def _wait_for_input_ready(driver, wait, tag=""):
     raise TimeoutError("Input box never became ready")
 
 
+def _copy_image_to_clipboard(img_path):
+    """Copy image to Windows clipboard as DIB — works with Ctrl+V in any browser."""
+    import win32clipboard
+    from PIL import Image as _Img
+    import io as _io
+    img = _Img.open(img_path).convert("RGB")
+    buf = _io.BytesIO()
+    img.save(buf, "BMP")
+    bmp_data = buf.getvalue()[14:]  # strip 14-byte BMP file header → raw DIB
+    win32clipboard.OpenClipboard()
+    win32clipboard.EmptyClipboard()
+    win32clipboard.SetClipboardData(win32clipboard.CF_DIB, bmp_data)
+    win32clipboard.CloseClipboard()
+
+
 def _upload_with_verify(driver, wait, files, tag=""):
     """
-    Upload EXACTLY 3 files (jewel, tag, background) — no more, no less.
-    Clears any leftover attachments from previous turns first.
+    Paste images into ChatGPT via clipboard (Ctrl+V) — one at a time.
+    Avoids file input lookups, dedup warnings, and popup dialogs entirely.
     """
-    # Hard limit — never upload more than 3 images
     files = files[:3]
 
-    # Remove any files already attached in the input box from a previous run
-    driver.execute_script("""
-        document.querySelectorAll('[data-testid*="file-thumbnail"] button, button[aria-label*="Remove"]')
-            .forEach(b => b.click());
-    """)
-    time.sleep(0.5)
-
-    fi = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, 'input[type="file"]')))
-    for i, f in enumerate(files, 1):
-        prev_thumbs = len(driver.find_elements(By.CSS_SELECTOR, '[class*="attach"], [class*="file-"]'))
-        fi.send_keys(f)
-        for _ in range(8):
-            time.sleep(1)
-            driver.execute_script("""
-                document.querySelectorAll('button').forEach(b => {
-                    const t = b.textContent.trim();
-                    if (['OK','Ok','Got it','Dismiss','Yes'].includes(t)) b.click();
-                });
-            """)
-            cur_thumbs = len(driver.find_elements(By.CSS_SELECTOR, '[class*="attach"], [class*="file-"]'))
-            if cur_thumbs > prev_thumbs:
+    # Find the ChatGPT input box
+    input_el = None
+    for sel in ['div#prompt-textarea', 'div[contenteditable="true"]',
+                '#prompt-textarea', 'textarea']:
+        try:
+            els = driver.find_elements(By.CSS_SELECTOR, sel)
+            for el in els:
+                if el.is_displayed():
+                    input_el = el
+                    break
+            if input_el:
                 break
-        _status(f"{tag}📎 Uploaded {i}/3")
-        time.sleep(0.5)
+        except Exception:
+            pass
+
+    if not input_el:
+        # Fallback to old file-input method if clipboard approach can't find input
+        _status(f"{tag}⚠ Input not found — falling back to file input")
+        try:
+            fi = wait.until(EC.presence_of_element_located(
+                (By.CSS_SELECTOR, 'input[type="file"]')))
+            for f in files:
+                fi.send_keys(f)
+                time.sleep(1)
+        except Exception as e:
+            _status(f"{tag}⚠ File input fallback failed: {e}")
+        return
+
+    input_el.click()
+    time.sleep(0.3)
+
+    for idx, img_path in enumerate(files, 1):
+        _copy_image_to_clipboard(img_path)
+        time.sleep(0.3)
+        ActionChains(driver).key_down(Keys.CONTROL).send_keys('v').key_up(Keys.CONTROL).perform()
+        time.sleep(1.0)   # wait for ChatGPT to render the thumbnail
+
+        # Dismiss any popup that appears (duplicate image warning etc.)
+        driver.execute_script("""
+            document.querySelectorAll('button').forEach(b => {
+                const t = (b.textContent || '').trim();
+                if (['OK','Ok','Got it','Dismiss','Yes','Continue'].includes(t)) b.click();
+            });
+        """)
+        _status(f"{tag}📋 Image {idx}/3 pasted")
 
 
 def _detect_rate_limit(driver) -> bool:

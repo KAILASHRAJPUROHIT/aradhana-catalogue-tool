@@ -433,10 +433,22 @@ def _copy_image_to_clipboard(img_path):
 def _upload_with_verify(driver, wait, files, tag=""):
     """
     Upload images to ChatGPT via the + button → file input.
-    This is Selenium's most reliable upload method — bypasses OS dialog,
-    no clipboard dependency, works regardless of focus.
+    Clears any existing thumbnails first so previous pair's images don't accumulate.
     """
     files = files[:3]
+
+    # Clear any thumbnails left from previous pair in this chat
+    try:
+        driver.execute_script("""
+            // Click X on every existing file thumbnail in the composer
+            document.querySelectorAll(
+                'button[aria-label*="Remove"], button[aria-label*="Delete"],\
+                 [data-testid*="remove"], [data-testid*="delete"]'
+            ).forEach(b => b.click());
+        """)
+        time.sleep(0.3)
+    except Exception:
+        pass
 
     # Click the + (Add files) button to reveal the file input
     try:

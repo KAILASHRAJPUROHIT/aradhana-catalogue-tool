@@ -311,15 +311,25 @@ def make_unique(src):
 # ── Clipboard helpers ─────────────────────────────────────────────────────────
 
 def _copy_img_clipboard(img_path):
+    """
+    Copy image to Windows clipboard in PNG format.
+    Chrome reads the registered 'PNG' clipboard format — much more reliable
+    than CF_DIB (BMP) which can render as a grey square in browser inputs.
+    """
     import win32clipboard, io as _io
     from PIL import Image as _I
+
     img = _I.open(img_path).convert("RGB")
     buf = _io.BytesIO()
-    img.save(buf, "BMP")
-    dib = buf.getvalue()[14:]
+    img.save(buf, "PNG")
+    png_data = buf.getvalue()
+
+    # Register "PNG" as a clipboard format — Chrome prioritises this
+    PNG_FORMAT = win32clipboard.RegisterClipboardFormat("PNG")
+
     win32clipboard.OpenClipboard()
     win32clipboard.EmptyClipboard()
-    win32clipboard.SetClipboardData(win32clipboard.CF_DIB, dib)
+    win32clipboard.SetClipboardData(PNG_FORMAT, png_data)
     win32clipboard.CloseClipboard()
 
 

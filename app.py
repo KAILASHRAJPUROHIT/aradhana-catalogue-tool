@@ -340,6 +340,9 @@ def _run_chatgpt_job(pairs, category, bg_name):
     # Load saved progress — skip already-completed pairs on resume
     progress = _load_progress(category)
 
+    # In-run tag dedup — skip if same tag already saved in THIS batch
+    seen_tags_this_run = set()
+
     results = list(CGPT_JOB.get("results") or [])
     for i, s in enumerate(pairs):
         pair_key = str(s["pair"])
@@ -350,6 +353,7 @@ def _run_chatgpt_job(pairs, category, bg_name):
         # ── Resume: skip already done ─────────────────────────────────
         if pair_key in progress and progress[pair_key].get("output"):
             saved = progress[pair_key]
+            seen_tags_this_run.add((saved.get("label") or "").strip().upper())
             CGPT_JOB["current"] = f"⏭ Pair {s['pair']} already done — skipping"
             results.append({"pair": s["pair"], "sku": saved["label"],
                             "output": saved["output"], "error": None, "skipped": True})

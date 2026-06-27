@@ -295,6 +295,30 @@
       <span id="statusSlots" style="color:#f7ca5b;font-size:12px;margin-left:8px"></span>
     </div>
     <div id="resultsGrid" class="results-grid" style="display:none"></div>
+
+    <!-- Side-by-side quality comparison panel -->
+    <div id="comparePanel" style="display:none;margin-top:24px">
+      <div style="color:#f0a500;font-weight:700;font-size:14px;margin-bottom:12px;letter-spacing:1px">
+        ⚖ QUALITY COMPARISON — SAME PAIR, BOTH ENGINES
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div id="compareLeft" style="background:#161b22;border-radius:8px;padding:16px;border:1px solid #30363d">
+          <div style="color:#cca137;font-weight:700;margin-bottom:8px">ChatGPT (GPT Image 1.5)</div>
+          <div id="cgptStatus" style="color:#8b8b8b;font-size:12px">⏳ Generating…</div>
+          <img id="cgptImg" src="" style="display:none;width:100%;border-radius:6px;margin-top:8px">
+          <div id="cgptErr" style="color:#f85149;font-size:11px;margin-top:6px;display:none"></div>
+        </div>
+        <div id="compareRight" style="background:#161b22;border-radius:8px;padding:16px;border:1px solid #30363d">
+          <div style="color:#4285f4;font-weight:700;margin-bottom:8px">Gemini (Gemini Advanced)</div>
+          <div id="gemStatus" style="color:#8b8b8b;font-size:12px">⏳ Generating…</div>
+          <img id="gemImg" src="" style="display:none;width:100%;border-radius:6px;margin-top:8px">
+          <div id="gemErr" style="color:#f85149;font-size:11px;margin-top:6px;display:none"></div>
+        </div>
+      </div>
+      <div style="margin-top:12px;color:#8b8b8b;font-size:11px">
+        Both images used identical prompt, images, and background. Judge quality, design preservation, and background integration.
+      </div>
+    </div>
   </div>
 
 </div>

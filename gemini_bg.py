@@ -533,7 +533,9 @@ def process(jewel_path, tag_path, bg_path, category="earrings",
     # ── 8. Read label from response ───────────────────────────────────────────
     try:
         txt = driver.execute_script("return document.body.innerText;") or ""
-        m = re.search(r"LABEL[:\s]+([A-Z0-9][A-Z0-9/_-]{1,18})", txt, re.I)
+        # No re.I — tag codes are uppercase (e.g. TP22/157). Lowercase prose like
+        # "followed" or "placed" must not match.
+        m = re.search(r"LABEL[:\s]+([A-Z][A-Z0-9/_-]{1,18})", txt)
         if m and " " not in m.group(1):
             label = m.group(1).strip()
             _status(f"{tag}🏷️ {label}")

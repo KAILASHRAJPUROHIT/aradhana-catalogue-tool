@@ -579,7 +579,19 @@ async function pollProgress() {
   document.getElementById('statusElapsed').textContent  = j.elapsed ? `${fmt(j.elapsed)} elapsed` : '';
   if (j.slots) document.getElementById('statusSlots').textContent = j.slots;
 
-  if (j.results && j.results.length) showResults(j.results, done, total);
+  if (j.results && j.results.length) {
+    showResults(j.results, done, total);
+    // Show errors in error log
+    const errs = j.results.filter(r => r.error && !r.skipped);
+    if (errs.length) {
+      const log = document.getElementById('errorLog');
+      const body = document.getElementById('errorLogBody');
+      log.style.display = 'block';
+      body.innerHTML = errs.map(r =>
+        `<div>Pair ${r.pair} [${r.sku||'?'}]: ${r.error}</div>`
+      ).join('');
+    }
+  }
 
   if (!j.running) {
     clearInterval(_polling);

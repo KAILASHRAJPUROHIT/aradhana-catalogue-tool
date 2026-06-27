@@ -354,11 +354,37 @@ def _copy_img_clipboard(img_path):
     win32clipboard.CloseClipboard()
 
 
+# ── Calibrated coordinates (1280×900 viewport, fresh chat layout) ────────────
+# Measured via CDP getBoundingClientRect on 2026-06-27.
+# All in the same row at y≈407 when input is centred (fresh /app page).
+_C = {
+    'input':  (574, 407),   # rich-textarea .ql-editor centre
+    'upload': (366, 407),   # "Upload & tools" button
+    'send':   (964, 407),   # "Send message" button (only visible with content)
+    'model':  (838, 407),   # Flash-Lite model picker
+}
+
+
+def _cdp_click(driver, x, y):
+    """Send a precise mouse click at (x,y) via CDP — no DOM needed."""
+    for evt in ("mousePressed", "mouseReleased"):
+        driver.execute_cdp_cmd("Input.dispatchMouseEvent", {
+            "type": evt, "x": x, "y": y,
+            "button": "left", "clickCount": 1,
+            "modifiers": 0,
+        })
+
+
+def _cdp_type(driver, text):
+    """Insert text at the current cursor position via CDP."""
+    driver.execute_cdp_cmd("Input.insertText", {"text": text})
+
+
 # ── Main process function ─────────────────────────────────────────────────────
 
 def process(jewel_path, tag_path, bg_path, category="earrings",
             pair_num=None, job_id=None):
-    import pyperclip, base64 as _b64, requests as _req
+    import base64 as _b64, requests as _req
     global _current_chat_url
     tag = f"[G:{pair_num}] " if pair_num else "[G] "
 

@@ -633,9 +633,14 @@ function showResults(results, done, total) {
                      <div style="color:${col};font-size:11px;font-weight:700">${lbl}</div>
                      ${findingHtml}`;
     } else if (r.output) {
+      const engineBadge = r.engine === 'gemini_fallback'
+        ? '<div style="color:#4285f4;font-size:10px">via Gemini fallback</div>'
+        : r.engine === 'gemini'
+        ? '<div style="color:#4285f4;font-size:10px">Gemini</div>'
+        : '';
       d.innerHTML = `<img src="/img/output/${r.output}" onerror="this.style.display='none'">
                      <div class="sku">${r.sku || '—'}</div>
-                     <div class="ok">✓ saved</div>`;
+                     <div class="ok">✓ saved</div>${engineBadge}`;
     } else if (r.skipped) {
       d.style.opacity = '0.5';
       d.innerHTML = `<div class="sku">${r.sku || '—'}</div>

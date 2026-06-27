@@ -353,14 +353,18 @@ def process(jewel_path, tag_path, bg_path, category="earrings",
     else:
         driver.switch_to.window(driver.window_handles[0])
 
-    # Delete previous chat before opening new one
-    if _current_chat_url:
-        _delete_chat(driver, _current_chat_url)
-        _current_chat_url = ""
+    # Navigate to fresh chat first — THEN delete the old one in background
+    # so deletion never blocks or navigates away from our new chat
+    _prev_chat_url = _current_chat_url
+    _current_chat_url = ""
 
     _status(f"{tag}💬 Opening fresh Gemini chat")
     driver.get("https://gemini.google.com/app")
     time.sleep(2.5)
+
+    # Delete previous chat now that we're safely on a new page
+    if _prev_chat_url:
+        _delete_chat(driver, _prev_chat_url)
 
     if not _ensure_logged_in(driver):
         return {"label": None, "output": None, "error": "Gemini: not logged in"}

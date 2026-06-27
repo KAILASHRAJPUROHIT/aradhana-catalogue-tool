@@ -64,6 +64,8 @@ def _ensure_chrome2():
         f"--remote-debugging-port={PORT2}",
         f"--user-data-dir={CHROME2}",
         "--no-first-run", "--no-default-browser-check",
+        "--window-position=-32000,-32000",   # off every screen — never visible
+        "--window-size=1280,900",
         "--homepage=https://gemini.google.com/app",
         "https://gemini.google.com/app",
     ])

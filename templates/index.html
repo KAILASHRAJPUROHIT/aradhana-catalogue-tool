@@ -247,6 +247,14 @@
     <div class="card-title"><span class="num">3</span> BACKGROUND <span style="font-weight:400;color:#8b949e">(auto-matches category, or pick manually)</span></div>
     <div id="bgConfirm" class="bg-confirm" style="margin-bottom:8px"></div>
     <div id="bgGrid" class="bg-grid"></div>
+    <div style="margin-top:10px;display:flex;align-items:center;gap:10px">
+      <label class="btn btn-outline" style="cursor:pointer;font-size:12px;padding:8px 14px">
+        📁 Browse for Background…
+        <input type="file" id="bgBrowse" accept=".jpg,.jpeg,.png,.webp"
+               style="display:none" onchange="uploadCustomBg(this)">
+      </label>
+      <span id="bgBrowseInfo" style="color:#8b949e;font-size:12px"></span>
+    </div>
   </div>
 
   <!-- Step 4: Stage -->

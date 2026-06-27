@@ -232,53 +232,67 @@ def craft_prompt_gemma(jewel_path: str, category: str, job_id: str = "") -> str:
 PROMPT = build_prompt("jewellery", "INIT")
 
 
+def _find_chrome_hwnds(keywords=("chrome",)):
+    """Return all visible Chrome window handles matching any keyword."""
+    import ctypes, ctypes.wintypes
+    u32   = ctypes.windll.user32
+    found = []
+    def _cb(hwnd, _):
+        if not u32.IsWindowVisible(hwnd):
+            return True
+        buf = ctypes.create_unicode_buffer(256)
+        u32.GetWindowTextW(hwnd, buf, 256)
+        t = buf.value.lower()
+        if any(k in t for k in keywords):
+            found.append(hwnd)
+        return True
+    CB = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.wintypes.HWND, ctypes.wintypes.LPARAM)
+    ctypes.windll.user32.EnumWindows(CB(_cb), 0)
+    return found
+
+
 def _chrome_to_background():
     """
-    Push the Chrome window to the bottom of the Z-order so it never
-    covers the user's work. Uses Win32 SetWindowPos — no minimize,
-    so JavaScript and image rendering continue unaffected.
+    Completely hide Chrome from screen, taskbar and Alt+Tab.
+    Selenium still controls it via debug port — rendering continues normally.
+    SW_HIDE (0) makes the window invisible without affecting JS execution.
     """
     try:
-        import ctypes, ctypes.wintypes
-        user32      = ctypes.windll.user32
-        HWND_BOTTOM = ctypes.wintypes.HWND(1)
-        SWP_FLAGS   = 0x0002 | 0x0001 | 0x0010   # NOMOVE | NOSIZE | NOACTIVATE
-        found       = []
+        import ctypes
+        u32           = ctypes.windll.user32
+        GWL_EXSTYLE   = -20
+        WS_EX_TOOLWINDOW = 0x00000080   # hide from Alt+Tab
+        WS_EX_APPWINDOW  = 0x00040000   # hide from taskbar
+        SW_HIDE          = 0
 
-        def _cb(hwnd, _):
-            buf = ctypes.create_unicode_buffer(256)
-            user32.GetWindowTextW(hwnd, buf, 256)
-            t = buf.value.lower()
-            if "chrome" in t or "chatgpt" in t:
-                found.append(hwnd)
-            return True
-
-        CB = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.wintypes.HWND, ctypes.wintypes.LPARAM)
-        user32.EnumWindows(CB(_cb), 0)
-        for hwnd in found:
-            user32.SetWindowPos(hwnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_FLAGS)
+        for hwnd in _find_chrome_hwnds():
+            # Remove from taskbar + Alt+Tab
+            style = u32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+            style = (style | WS_EX_TOOLWINDOW) & ~WS_EX_APPWINDOW
+            u32.SetWindowLongW(hwnd, GWL_EXSTYLE, style)
+            # Hide window completely
+            u32.ShowWindow(hwnd, SW_HIDE)
     except Exception:
-        pass   # non-Windows or permission issue — silently skip
+        pass
 
 
 def _chrome_to_foreground():
-    """Bring Chrome window to the front so the user can see the login page."""
+    """Reveal Chrome so user can log in — called only when login is required."""
     try:
-        import ctypes, ctypes.wintypes
-        user32 = ctypes.windll.user32
-        HWND_TOP = ctypes.wintypes.HWND(0)
-        found = []
-        def _cb(hwnd, _):
-            buf = ctypes.create_unicode_buffer(256)
-            user32.GetWindowTextW(hwnd, buf, 256)
-            if "chrome" in buf.value.lower() or "chatgpt" in buf.value.lower():
-                found.append(hwnd)
-            return True
-        CB = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.wintypes.HWND, ctypes.wintypes.LPARAM)
-        user32.EnumWindows(CB(_cb), 0)
-        for hwnd in found:
-            user32.ShowWindow(hwnd, 9)       # SW_RESTORE
-            user32.SetForegroundWindow(hwnd)
+        import ctypes
+        u32              = ctypes.windll.user32
+        GWL_EXSTYLE      = -20
+        WS_EX_APPWINDOW  = 0x00040000
+        WS_EX_TOOLWINDOW = 0x00000080
+        SW_RESTORE       = 9
+
+        for hwnd in _find_chrome_hwnds():
+            # Restore taskbar + Alt+Tab visibility
+            style = u32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+            style = (style | WS_EX_APPWINDOW) & ~WS_EX_TOOLWINDOW
+            u32.SetWindowLongW(hwnd, GWL_EXSTYLE, style)
+            u32.ShowWindow(hwnd, SW_RESTORE)
+            u32.SetForegroundWindow(hwnd)
     except Exception:
         pass
 

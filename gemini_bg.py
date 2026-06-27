@@ -325,22 +325,46 @@ def process(jewel_path, tag_path, bg_path, category="earrings",
     else:
         driver.switch_to.window(driver.window_handles[0])
 
-    # Chat rotation
+    cur_url = driver.current_url.lower()
+    on_gemini = "gemini.google.com" in cur_url
+
+    # Chat rotation — only navigate when we genuinely need a new chat
     need_new = (
         _chat_pair_count == 0
         or _chat_pair_count >= CHAT_ROTATE_EVERY
         or not _current_chat_url
     )
+
     if need_new:
+        # Delete old chat if there was one
         if _current_chat_url:
             _delete_chat(driver, _current_chat_url)
             _current_chat_url = ""
-        _status(f"{tag}💬 New Gemini chat")
-        driver.get("https://gemini.google.com/app")
-        time.sleep(3)
         _chat_pair_count = 0
+
+        if on_gemini:
+            # Already on Gemini — click "New chat" link instead of full navigation
+            # This is faster and avoids a page reload flash
+            clicked = driver.execute_script("""
+                const link = Array.from(document.querySelectorAll('a, button, [role="link"]'))
+                    .find(el => /new chat/i.test(el.textContent.trim()));
+                if (link) { link.click(); return true; }
+                return false;
+            """)
+            if clicked:
+                _status(f"{tag}💬 Clicked 'New chat' in sidebar")
+                time.sleep(2)
+            else:
+                # Fallback: navigate to fresh chat URL
+                driver.get("https://gemini.google.com/app")
+                time.sleep(3)
+        else:
+            _status(f"{tag}💬 Navigating to Gemini")
+            driver.get("https://gemini.google.com/app")
+            time.sleep(3)
     else:
-        _status(f"{tag}💬 Reusing Gemini chat ({_chat_pair_count}/{CHAT_ROTATE_EVERY})")
+        # Reuse current chat — just scroll to bottom so input is in view
+        _status(f"{tag}💬 Continuing in same chat ({_chat_pair_count}/{CHAT_ROTATE_EVERY})")
         try:
             driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
             time.sleep(0.5)

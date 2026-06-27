@@ -13,6 +13,10 @@ timeout /t 3 >nul
 REM Clear Python cache
 if exist __pycache__ rmdir /s /q __pycache__ >nul 2>&1
 
+REM ── Create dedicated virtual desktop for catalogue Chromes ──────────────────
+echo Setting up catalogue virtual desktop...
+"C:\Users\kaila\AppData\Local\Programs\Python\Python311\python.exe" -c "import vdesk; vdesk.setup_catalogue_desktop(); print('Desktop ready')" 2>nul
+
 REM ── ChatGPT Chrome (port 9222) — opens directly on chatgpt.com ──────────────
 netstat -ano | findstr ":9222" | findstr LISTENING >nul 2>&1
 if errorlevel 1 (

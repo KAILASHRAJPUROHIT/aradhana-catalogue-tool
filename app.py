@@ -472,6 +472,20 @@ def _run_chatgpt_job(pairs, category, bg_name):
         if result.get("output") and os.path.exists(result["output"]):
             os.replace(result["output"], out_path)
 
+            # ── Jewellery presence check — reject empty backgrounds ────────
+            jcheck = catalogue_db.verify_jewellery_present(out_path)
+            if not jcheck["ok"]:
+                CGPT_JOB["current"] = f"⚠ Pair {s['pair']} — no jewellery in output ({jcheck['reason'][:60]}) — retrying"
+                os.remove(out_path)
+                # Force one more attempt on the next loop iteration
+                result = {"error": f"no-jewellery: {jcheck['reason']}"}
+                # Treat as failed so retry logic kicks in
+                results.append({"pair": s["pair"], "sku": label, "output": None,
+                                "error": f"Empty background — retrying: {jcheck['reason'][:80]}"})
+                CGPT_JOB["done"]    = i + 1
+                CGPT_JOB["results"] = results
+                continue
+
             # ── Persistent 30-day duplicate / cross-check ─────────────────
             findings = catalogue_db.check_and_record(label, out_path, category)
 

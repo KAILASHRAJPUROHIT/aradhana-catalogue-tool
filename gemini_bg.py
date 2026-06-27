@@ -356,20 +356,9 @@ def process(jewel_path, tag_path, bg_path, category="earrings",
     prompt = build_prompt(category, _jid, filename=_filename)
     files  = [make_unique(p) for p in [jewel_path, tag_path, bg_path]]
 
-    _status(f"{tag}📎 Uploading images to Gemini")
+    _status(f"{tag}📋 Pasting images into Gemini via clipboard")
 
-    # ── Shadow DOM helpers ────────────────────────────────────────────────────
-    _SHADOW_FIND_INPUT = """
-        function findAll(root, sel) {
-            let results = Array.from(root.querySelectorAll(sel));
-            root.querySelectorAll('*').forEach(el => {
-                if (el.shadowRoot) results = results.concat(findAll(el.shadowRoot, sel));
-            });
-            return results;
-        }
-        return findAll(document, 'input[type="file"]');
-    """
-
+    # ── Shadow DOM image finder (used later for output detection) ─────────────
     _SHADOW_FIND_IMGS = """
         function findAllImgs(root) {
             let imgs = Array.from(root.querySelectorAll('img'));
@@ -379,98 +368,56 @@ def process(jewel_path, tag_path, bg_path, category="earrings",
             return imgs.map(i => ({
                 src: i.src || i.currentSrc || i.getAttribute('src') || '',
                 w: i.offsetWidth || i.naturalWidth || 0,
-                h: i.offsetHeight || i.naturalHeight || 0,
-                el: i
+                h: i.offsetHeight || i.naturalHeight || 0
             }));
         }
         return findAllImgs(document);
     """
 
+    def _copy_image_to_clipboard(img_path):
+        """Copy a single image to Windows clipboard as DIB (paste-ready)."""
+        import win32clipboard
+        from PIL import Image as _Img
+        import io as _io
+        img = _Img.open(img_path).convert("RGB")
+        buf = _io.BytesIO()
+        img.save(buf, "BMP")
+        bmp_data = buf.getvalue()[14:]   # strip 14-byte BMP file header → DIB data
+        win32clipboard.OpenClipboard()
+        win32clipboard.EmptyClipboard()
+        win32clipboard.SetClipboardData(win32clipboard.CF_DIB, bmp_data)
+        win32clipboard.CloseClipboard()
+
     try:
-        all_paths = "\n".join(os.path.abspath(f) for f in files)
+        # ── Find Gemini's text input ──────────────────────────────────────
+        input_el = driver.execute_script("""
+            const rt = document.querySelector('rich-textarea');
+            if (rt) {
+                const inner = rt.querySelector('[contenteditable="true"]');
+                if (inner) return inner;
+            }
+            return Array.from(document.querySelectorAll('[contenteditable="true"]'))
+                       .find(el => el.offsetParent !== null && el.offsetWidth > 50)
+                   || document.querySelector('textarea');
+        """)
 
-        def _try_file_input():
-            """Find file input including inside shadow DOM and send paths."""
-            try:
-                file_inputs = driver.execute_script(_SHADOW_FIND_INPUT)
-                for fi in (file_inputs or []):
-                    try:
-                        driver.execute_script("""
-                            arguments[0].style.cssText =
-                                'display:block!important;visibility:visible!important;';
-                        """, fi)
-                        fi.send_keys(all_paths)
-                        return True
-                    except Exception:
-                        pass
-            except Exception:
-                pass
-            return False
+        if not input_el:
+            raise Exception("Gemini input box not found")
 
-        uploaded = False
+        # Click to focus the input
+        input_el.click()
+        time.sleep(0.3)
 
-        # Method 1: direct shadow-DOM search for file input
-        if _try_file_input():
-            uploaded = True
-            _status(f"{tag}✅ Files uploaded (shadow DOM input)")
-            time.sleep(2)
+        # ── Paste each image one by one via clipboard ─────────────────────
+        for idx, img_path in enumerate(files):
+            _status(f"{tag}  pasting image {idx+1}/3…")
+            _copy_image_to_clipboard(img_path)
+            time.sleep(0.3)
+            # Ctrl+V pastes the image into the focused Gemini input
+            ActionChains(driver).key_down(Keys.CONTROL).send_keys('v').key_up(Keys.CONTROL).perform()
+            time.sleep(0.8)   # let Gemini render the thumbnail
 
-        if not uploaded:
-            # Method 2: click + button → wait for menu → click upload → find input
-            _status(f"{tag}  clicking + button")
-            driver.execute_script("""
-                function findBtn(root) {
-                    const btns = Array.from(root.querySelectorAll('button, [role="button"]'));
-                    const found = btns.find(b => {
-                        const l = (b.getAttribute('aria-label') || b.textContent || '').trim();
-                        return l === '+' || /add (image|file|more)/i.test(l) ||
-                               /more options/i.test(l) || /attach/i.test(l);
-                    });
-                    if (found) return found;
-                    for (const el of root.querySelectorAll('*')) {
-                        if (el.shadowRoot) {
-                            const r = findBtn(el.shadowRoot);
-                            if (r) return r;
-                        }
-                    }
-                    return null;
-                }
-                const btn = findBtn(document);
-                if (btn) btn.click();
-            """)
-            time.sleep(1.5)
-
-            # Click upload/image option in menu
-            driver.execute_script("""
-                function findMenuItem(root) {
-                    const items = Array.from(root.querySelectorAll(
-                        '[role="menuitem"], [role="option"], button, li, a'));
-                    const found = items.find(el => {
-                        const t = (el.textContent || el.getAttribute('aria-label') || '').toLowerCase();
-                        return t.includes('upload') || t.includes('computer') ||
-                               (t.includes('image') && !t.includes('gemini'));
-                    });
-                    if (found) return found;
-                    for (const el of root.querySelectorAll('*')) {
-                        if (el.shadowRoot) {
-                            const r = findMenuItem(el.shadowRoot);
-                            if (r) return r;
-                        }
-                    }
-                    return null;
-                }
-                const item = findMenuItem(document);
-                if (item) item.click();
-            """)
-            time.sleep(1)
-
-            if _try_file_input():
-                uploaded = True
-                _status(f"{tag}✅ Files uploaded (menu → shadow DOM)")
-                time.sleep(2)
-
-        if not uploaded:
-            _status(f"{tag}⚠️ File upload failed — sending prompt only")
+        _status(f"{tag}✅ 3 images pasted")
 
         # ── Step 2: Find the text input ───────────────────────────────────
         # Gemini uses <rich-textarea> web component with inner contenteditable div

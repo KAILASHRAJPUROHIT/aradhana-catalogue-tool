@@ -193,6 +193,8 @@ def _ensure_chrome():
         "--remote-debugging-port=9222",
         r"--user-data-dir=C:\Users\kaila\AppData\Local\AutoCatalogueChrome",
         "--no-first-run", "--no-default-browser-check",
+        "--window-position=-32000,-32000",   # off every screen — never visible
+        "--window-size=1280,900",
         "--homepage=https://chatgpt.com",
         "https://chatgpt.com",
     ])

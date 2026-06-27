@@ -391,6 +391,32 @@ async function stageFiles() {
 
 // ── Step 5: Process ───────────────────────────────────────────────────────────
 
+async function runGemini() {
+  const cat = document.getElementById('catSelect').value;
+  if (!cat) { alert('Select ornament type first.'); return; }
+  const bg = document.getElementById('bgSelect')?.value || '';
+  document.getElementById('geminiBtn').disabled = true;
+  document.getElementById('statusCur').textContent = 'Starting Gemini…';
+  await fetch('/api/gemini_run', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({category: cat, bg})});
+  if (_polling) clearInterval(_polling);
+  _polling = setInterval(pollChatGPT, 1500);
+}
+
+async function runParallel() {
+  const cat = document.getElementById('catSelect').value;
+  if (!cat) { alert('Select ornament type first.'); return; }
+  const bg = document.getElementById('bgSelect')?.value || '';
+  document.getElementById('runBtn').disabled = true;
+  document.getElementById('geminiBtn').disabled = true;
+  document.getElementById('parallelBtn').disabled = true;
+  document.getElementById('statusCur').textContent = 'Starting ChatGPT + Gemini…';
+  await fetch('/api/parallel_run', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({category: cat, bg})});
+  if (_polling) clearInterval(_polling);
+  _polling = setInterval(pollChatGPT, 1500);
+}
+
 async function newChat() {
   if (!confirm('Start a fresh ChatGPT conversation? (clears saved chat)')) return;
   await fetch('/api/new_chat', {method:'POST'});

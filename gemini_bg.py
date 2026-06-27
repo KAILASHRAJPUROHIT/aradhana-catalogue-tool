@@ -308,379 +308,227 @@ def make_unique(src):
     img.save(tmp.name, "JPEG", quality=95)
     return tmp.name
 
+# ── Clipboard helpers ─────────────────────────────────────────────────────────
+
+def _copy_img_clipboard(img_path):
+    import win32clipboard, io as _io
+    from PIL import Image as _I
+    img = _I.open(img_path).convert("RGB")
+    buf = _io.BytesIO()
+    img.save(buf, "BMP")
+    dib = buf.getvalue()[14:]
+    win32clipboard.OpenClipboard()
+    win32clipboard.EmptyClipboard()
+    win32clipboard.SetClipboardData(win32clipboard.CF_DIB, dib)
+    win32clipboard.CloseClipboard()
+
+
 # ── Main process function ─────────────────────────────────────────────────────
 
 def process(jewel_path, tag_path, bg_path, category="earrings",
             pair_num=None, job_id=None):
-    global _chat_pair_count, _current_chat_url
+    import pyperclip, base64 as _b64, requests as _req
+    global _current_chat_url
     tag = f"[G:{pair_num}] " if pair_num else "[G] "
 
     driver = connect()
 
-    # Switch to Gemini window/tab
+    # ── 1. Navigate to a fresh Gemini chat every single time ─────────────────
+    # No rotation, no reuse — each pair gets a clean blank chat.
+    # Gemini generates in 3-8s so the 2s navigation cost is negligible.
     for handle in driver.window_handles:
         driver.switch_to.window(handle)
-        if "gemini" in driver.current_url.lower() or "google" in driver.current_url.lower():
+        if "gemini.google.com" in driver.current_url:
             break
     else:
         driver.switch_to.window(driver.window_handles[0])
 
-    cur_url = driver.current_url.lower()
-    on_gemini = "gemini.google.com" in cur_url
+    # Delete previous chat before opening new one
+    if _current_chat_url:
+        _delete_chat(driver, _current_chat_url)
+        _current_chat_url = ""
 
-    # Chat rotation — only navigate when we genuinely need a new chat
-    need_new = (
-        _chat_pair_count == 0
-        or _chat_pair_count >= CHAT_ROTATE_EVERY
-        or not _current_chat_url
-    )
-
-    if need_new:
-        # Delete old chat if there was one
-        if _current_chat_url:
-            _delete_chat(driver, _current_chat_url)
-            _current_chat_url = ""
-        _chat_pair_count = 0
-
-        if on_gemini:
-            # Already on Gemini — click "New chat" link instead of full navigation
-            # This is faster and avoids a page reload flash
-            clicked = driver.execute_script("""
-                const link = Array.from(document.querySelectorAll('a, button, [role="link"]'))
-                    .find(el => /new chat/i.test(el.textContent.trim()));
-                if (link) { link.click(); return true; }
-                return false;
-            """)
-            if clicked:
-                _status(f"{tag}💬 Clicked 'New chat' in sidebar")
-                time.sleep(2)
-            else:
-                # Fallback: navigate to fresh chat URL
-                driver.get("https://gemini.google.com/app")
-                time.sleep(3)
-        else:
-            _status(f"{tag}💬 Navigating to Gemini")
-            driver.get("https://gemini.google.com/app")
-            time.sleep(3)
-    else:
-        # Reuse current chat — just scroll to bottom so input is in view
-        _status(f"{tag}💬 Continuing in same chat ({_chat_pair_count}/{CHAT_ROTATE_EVERY})")
-        try:
-            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            time.sleep(0.5)
-        except Exception:
-            pass
+    _status(f"{tag}💬 Opening fresh Gemini chat")
+    driver.get("https://gemini.google.com/app")
+    time.sleep(2.5)
 
     if not _ensure_logged_in(driver):
-        return {"label": None, "output": None, "error": "Gemini login timeout"}
+        return {"label": None, "output": None, "error": "Gemini: not logged in"}
 
-    # Build prompt + unique images
+    # ── 2. Wait for input to be ready ────────────────────────────────────────
+    input_el = None
+    for _ in range(10):
+        input_el = driver.execute_script("""
+            const rt = document.querySelector('rich-textarea');
+            if (rt) return rt.querySelector('[contenteditable="true"]');
+            return null;
+        """)
+        if input_el:
+            break
+        time.sleep(0.5)
+
+    if not input_el:
+        return {"label": None, "output": None, "error": "Gemini: input not ready"}
+
+    # ── 3. Paste 3 images via clipboard one by one ────────────────────────────
+    _status(f"{tag}📋 Pasting 3 images")
+    input_el.click()
+    time.sleep(0.3)
+
+    for idx, img_path in enumerate([jewel_path, tag_path, bg_path], 1):
+        _copy_img_clipboard(img_path)
+        time.sleep(0.3)
+        ActionChains(driver).key_down(Keys.CONTROL).send_keys('v').key_up(Keys.CONTROL).perform()
+        time.sleep(0.8)
+        _status(f"{tag}  image {idx}/3 pasted")
+
+    # ── 4. Paste prompt text ─────────────────────────────────────────────────
     _filename = os.path.splitext(os.path.basename(jewel_path))[0]
     _jid = job_id or re.sub(r"[^A-Za-z0-9]", "", _filename)[:12]
     prompt = build_prompt(category, _jid, filename=_filename)
-    files  = [make_unique(p) for p in [jewel_path, tag_path, bg_path]]
+    pyperclip.copy(prompt)
+    time.sleep(0.2)
+    ActionChains(driver).key_down(Keys.CONTROL).send_keys('v').key_up(Keys.CONTROL).perform()
+    time.sleep(0.4)
+    _status(f"{tag}📝 Prompt pasted")
 
-    _status(f"{tag}📋 Pasting images into Gemini via clipboard")
-
-    # ── Shadow DOM image finder (used later for output detection) ─────────────
-    _SHADOW_FIND_IMGS = """
-        function findAllImgs(root) {
-            let imgs = Array.from(root.querySelectorAll('img'));
-            root.querySelectorAll('*').forEach(el => {
-                if (el.shadowRoot) imgs = imgs.concat(findAllImgs(el.shadowRoot));
-            });
-            return imgs.map(i => ({
-                src: i.src || i.currentSrc || i.getAttribute('src') || '',
-                w: i.offsetWidth || i.naturalWidth || 0,
-                h: i.offsetHeight || i.naturalHeight || 0
-            }));
-        }
-        return findAllImgs(document);
-    """
-
-    def _copy_image_to_clipboard(img_path):
-        """Copy a single image to Windows clipboard as DIB (paste-ready)."""
-        import win32clipboard
-        from PIL import Image as _Img
-        import io as _io
-        img = _Img.open(img_path).convert("RGB")
-        buf = _io.BytesIO()
-        img.save(buf, "BMP")
-        bmp_data = buf.getvalue()[14:]   # strip 14-byte BMP file header → DIB data
-        win32clipboard.OpenClipboard()
-        win32clipboard.EmptyClipboard()
-        win32clipboard.SetClipboardData(win32clipboard.CF_DIB, bmp_data)
-        win32clipboard.CloseClipboard()
-
+    # ── 5. Snapshot all current images (thumbnails we just pasted) ────────────
+    pre_srcs = set()
     try:
-        # ── Find Gemini's text input precisely ───────────────────────────
-        # Gemini's input is inside a <rich-textarea> component at the bottom.
-        # We find the contenteditable div inside it — NOT any div on the page.
-        input_el = driver.execute_script("""
-            // 1. rich-textarea custom component (most reliable)
-            const rt = document.querySelector('rich-textarea');
-            if (rt) {
-                const ce = rt.querySelector('[contenteditable="true"]');
-                if (ce) return ce;
-            }
-            // 2. Any contenteditable that's inside the input area / footer
-            const footer = document.querySelector(
-                'footer, [class*="input-area"], [class*="chat-input"], ' +
-                '[class*="input-container"], [data-testid*="input"]'
-            );
-            if (footer) {
-                const ce = footer.querySelector('[contenteditable="true"]');
-                if (ce) return ce;
-            }
-            // 3. Last resort: largest visible contenteditable
-            return Array.from(document.querySelectorAll('[contenteditable="true"]'))
-                .filter(el => el.offsetParent && el.offsetWidth > 200 &&
-                              el.getBoundingClientRect().top > window.innerHeight * 0.5)
-                .sort((a,b) => b.offsetWidth - a.offsetWidth)[0] || null;
-        """)
-
-        if not input_el:
-            raise Exception("Gemini input box not found")
-
-        # Click to focus the input
-        input_el.click()
-        time.sleep(0.3)
-
-        # ── Paste each image one by one via clipboard ─────────────────────
-        for idx, img_path in enumerate(files):
-            _status(f"{tag}  pasting image {idx+1}/3…")
-            _copy_image_to_clipboard(img_path)
-            time.sleep(0.3)
-            # Ctrl+V pastes the image into the focused Gemini input
-            ActionChains(driver).key_down(Keys.CONTROL).send_keys('v').key_up(Keys.CONTROL).perform()
-            time.sleep(0.8)   # let Gemini render the thumbnail
-
-        _status(f"{tag}✅ 3 images pasted — typing prompt")
-
-        # ── Type prompt using clipboard paste (most reliable for contenteditable) ─
-        import pyperclip
-        pyperclip.copy(prompt)
-        time.sleep(0.2)
-        ActionChains(driver).key_down(Keys.CONTROL).send_keys('v').key_up(Keys.CONTROL).perform()
-        time.sleep(0.5)
-
-        # Verify text appeared, fallback to send_keys if not
-        has_text = driver.execute_script(
-            "return (document.querySelector('[contenteditable]') || {}).textContent || '';")
-        if not has_text or len(has_text.strip()) < 5:
-            _status(f"{tag}  clipboard paste failed — using send_keys")
-            input_el.click()
-            input_el.send_keys(prompt)
-            time.sleep(0.3)
-
-        # ── Snapshot existing images BEFORE sending ───────────────────────
-        try:
-            _existing_srcs = set(driver.execute_script("""
-                function getAll(root) {
-                    let srcs = Array.from(root.querySelectorAll('img')).map(i => i.src || '');
-                    root.querySelectorAll('*').forEach(el => {
-                        if (el.shadowRoot) srcs = srcs.concat(getAll(el.shadowRoot));
-                    });
-                    return srcs;
-                }
-                return getAll(document).filter(s => s.length > 0);
-            """) or [])
-        except Exception:
-            _existing_srcs = set()
-
-        # ── Send ─────────────────────────────────────────────────────────
-        sent = driver.execute_script("""
-            const byLabel = Array.from(document.querySelectorAll('button')).find(b => {
-                const l = (b.getAttribute('aria-label') || b.title || '').toLowerCase();
-                return l.includes('send') || l === 'send message' || l.includes('submit');
-            });
-            if (byLabel && !byLabel.disabled) { byLabel.click(); return 'button'; }
-            return null;
-        """)
-        if not sent:
-            _status(f"{tag}  pressing Enter")
-            input_el.send_keys(Keys.RETURN)
-        else:
-            _status(f"{tag}  sent via {sent}")
-
-        _chat_pair_count += 1
-        time.sleep(1)
-        try:
-            cur = driver.current_url
-            if "/app/" in cur:
-                _current_chat_url = cur
-        except Exception:
-            pass
-
-    except Exception as e:
-        _status(f"{tag}⚠️ Send error: {e}")
-
-    # Snapshot after send for dedup
-    try:
-        _existing_srcs = set(driver.execute_script("""
-            return Array.from(document.querySelectorAll('img'))
-                .map(i => i.src || i.currentSrc || '')
-                .filter(s => s.length > 0);
-        """) or [])
-    except Exception:
-        _existing_srcs = set()
-
-    # Push Chrome to background
-    _chrome_to_background()
-    _status(f"{tag}⏳ Prompt sent — Gemini generating")
-    time.sleep(1)
-
-    label = None
-
-    def _scan_shadow_imgs():
-        """
-        Find new generated image piercing ALL shadow DOM — 1 per second poll.
-        Returns img src string or None.
-        """
-        try:
-            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            infos = driver.execute_script(_SHADOW_FIND_IMGS) or []
-            best_src, best_area = None, 0
-            for info in infos:
-                s = info.get("src", "")
-                w = info.get("w", 0)
-                h = info.get("h", 0)
-                if not s or s in _existing_srcs:
-                    continue
-                if "svg" in s or "favicon" in s or "avatar" in s:
-                    continue
-                if w < 100 or h < 100:
-                    continue
-                area = w * h
-                if area > best_area:
-                    best_area = area
-                    best_src = s
-            return best_src
-        except Exception:
-            return None
-
-    # ── Per-second polling — runs throughout generation ───────────────────────
-    # Gemini can finish in 3-8 seconds. Poll every second from the moment
-    # the prompt is sent so we never miss a fast response.
-    # Simultaneously watch for the stop button for slow responses.
-    _status(f"{tag}⏳ Watching Gemini every second…")
-    img_src  = None
-    deadline = time.time() + 420
-
-    # Phase 1: Fast poll first 20 seconds (catches Gemini's typical speed)
-    for t in range(20):
-        time.sleep(1)
-        found = _scan_shadow_imgs()
-        if found:
-            _status(f"{tag}⚡ Image found at {t+1}s: {found[:80]}")
-            img_src = found
-            break
-        # Also check if stop button appeared + disappeared (slower model)
-        vis = _safe_js(driver, _STOP_JS)
-        if t == 0 and vis:
-            _status(f"{tag}⬛ Generating…")
-
-    # Phase 2: If not found yet, keep polling while watching stop button
-    if not img_src:
-        _status(f"{tag}⏳ Still waiting — polling every second")
-        gen_done = False
-        while time.time() < deadline and not img_src:
-            time.sleep(1)
-            found = _scan_shadow_imgs()
-            if found:
-                _status(f"{tag}🖼️ Image found: {found[:80]}")
-                img_src = found
-                break
-            vis = _safe_js(driver, _STOP_JS)
-            if gen_done and not vis:
-                # Stop disappeared — wait 2 more seconds then scan one more time
-                time.sleep(2)
-                img_src = _scan_shadow_imgs()
-                break
-            if vis:
-                gen_done = True
-
-    if not img_src:
-        return {"label": label, "output": None, "error": "Gemini: image not found after polling"}
-
-    # Read label from response text
-    try:
-        msg_text = driver.execute_script("""
-            const msgs = Array.from(document.querySelectorAll(
-                '[class*="response"], [class*="message"], [class*="model-response"], message-content'));
-            return msgs.length ? msgs[msgs.length-1].innerText : document.body.innerText;
-        """) or ""
-        m = re.search(r"LABEL[:\s]+([A-Z0-9][A-Z0-9/_-]{1,18})", msg_text, re.I)
-        if m and " " not in m.group(1):
-            label = m.group(1).strip().rstrip(".")
-            _status(f"{tag}🏷️ Label: {label}")
+        pre_srcs = set(driver.execute_script(
+            "return Array.from(document.querySelectorAll('img'))"
+            ".map(i=>i.src||'').filter(s=>s);"
+        ) or [])
     except Exception:
         pass
 
-    # Download image
-    import base64 as _b64
+    # ── 6. Send ───────────────────────────────────────────────────────────────
+    sent = driver.execute_script("""
+        const btn = Array.from(document.querySelectorAll('button')).find(b =>
+            /send/i.test(b.getAttribute('aria-label') || b.title || ''));
+        if (btn && !btn.disabled) { btn.click(); return true; }
+        return false;
+    """)
+    if not sent:
+        input_el.send_keys(Keys.RETURN)
+    _status(f"{tag}📤 Sent — watching for image every second")
+
+    # Save chat URL for later deletion
+    time.sleep(1)
+    try:
+        if "/app/" in driver.current_url:
+            _current_chat_url = driver.current_url
+    except Exception:
+        pass
+
+    _chrome_to_background()
+
+    # ── 7. Per-second polling for generated image ─────────────────────────────
+    # Gemini typically finishes in 3-15 seconds.
+    # We poll every second looking for a NEW large image that wasn't in pre_srcs.
+    label   = None
+    img_src = None
+    start   = time.time()
+
+    for tick in range(120):  # up to 2 minutes
+        time.sleep(1)
+        try:
+            driver.execute_script("window.scrollTo(0,document.body.scrollHeight);")
+            all_imgs = driver.find_elements(By.TAG_NAME, "img")
+            best_src, best_area = None, 0
+            for el in all_imgs:
+                try:
+                    s = el.get_attribute("src") or ""
+                    if not s or s in pre_srcs:
+                        continue
+                    if "svg" in s or "favicon" in s or "avatar" in s or "thumbnail" in s:
+                        continue
+                    sz = el.size
+                    w, h = sz.get("width", 0), sz.get("height", 0)
+                    if w < 150 or h < 150:
+                        continue
+                    if w * h > best_area:
+                        best_area = w * h
+                        best_src  = s
+                except Exception:
+                    pass
+            if best_src:
+                img_src = best_src
+                _status(f"{tag}⚡ Image found at {tick+1}s ({int(best_area**0.5)}px): {best_src[:80]}")
+                break
+            if tick % 10 == 9:
+                _status(f"{tag}⏳ Still generating… {tick+1}s")
+        except Exception as e:
+            _status(f"{tag}  tick {tick}: {e}")
+
+    if not img_src:
+        return {"label": None, "output": None, "error": "Gemini: image not found in 2 minutes"}
+
+    # ── 8. Read label from response ───────────────────────────────────────────
+    try:
+        txt = driver.execute_script("return document.body.innerText;") or ""
+        m = re.search(r"LABEL[:\s]+([A-Z0-9][A-Z0-9/_-]{1,18})", txt, re.I)
+        if m and " " not in m.group(1):
+            label = m.group(1).strip()
+            _status(f"{tag}🏷️ {label}")
+    except Exception:
+        pass
+
+    # ── 9. Download the image ─────────────────────────────────────────────────
     safe = re.sub(r'[/\\:*?"<>|]', '_', label or "studio")
     out  = os.path.join(OUTPUT, f"{safe}_gemini.png")
 
-    def _finish(lbl, path):
-        if _current_chat_url:
-            _delete_chat(driver, _current_chat_url)
-        return {"label": lbl, "output": path, "error": None}
-
-    # Method A: blob URL → canvas
-    if img_src.startswith("blob:"):
-        try:
-            img_el = next((el for s, el in [(img_src, e) for _, e in
-                          [(x, driver.find_element(By.XPATH, f'//img[@src="{img_src}"]'))
-                           for x in [1]] if True] if True), None)
-        except Exception:
-            img_el = None
-        b64 = _safe_js(driver, f"""
-            return new Promise(resolve => {{
-                const img = Array.from(document.querySelectorAll('img'))
-                    .find(i => i.src === '{img_src}' || i.currentSrc === '{img_src}');
-                if (!img) {{ resolve(null); return; }}
-                const c = document.createElement('canvas');
-                c.width = img.naturalWidth || 1024;
-                c.height = img.naturalHeight || 1024;
-                c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-                resolve(c.toDataURL('image/png').split(',')[1]);
-            }});
-        """, timeout=15)
-        if b64:
-            data = _b64.b64decode(b64)
-            with open(out, "wb") as f: f.write(data)
-            _status(f"{tag}✓ Saved {label} via canvas ({len(data)//1024}KB)")
-            return _finish(label, out)
-
-    # Method B: requests with cookies
+    # Method A: requests with cookies (works for Google CDN URLs)
     try:
-        import requests as _req
         cookies = {c["name"]: c["value"] for c in driver.get_cookies()}
-        headers = {"User-Agent": driver.execute_script("return navigator.userAgent;")}
-        resp = _req.get(img_src, cookies=cookies, headers=headers, timeout=30)
-        if resp.status_code == 200 and len(resp.content) > 10000:
+        ua      = driver.execute_script("return navigator.userAgent;")
+        resp    = _req.get(img_src, cookies=cookies, headers={"User-Agent": ua}, timeout=30)
+        if resp.status_code == 200 and len(resp.content) > 5000:
             with open(out, "wb") as f: f.write(resp.content)
-            _status(f"{tag}✓ Saved {label} via requests ({len(resp.content)//1024}KB)")
-            return _finish(label, out)
+            _status(f"{tag}✓ {label} saved via requests ({len(resp.content)//1024}KB)")
+            _delete_chat(driver, _current_chat_url)
+            return {"label": label, "output": out, "error": None}
     except Exception as e:
-        _status(f"{tag}⚠️ requests: {e}")
+        _status(f"{tag}  requests failed: {e}")
+
+    # Method B: canvas toDataURL (for blob: or restricted URLs)
+    b64 = driver.execute_script(f"""
+        return new Promise(resolve => {{
+            const img = Array.from(document.querySelectorAll('img'))
+                .find(i => i.src === '{img_src}');
+            if (!img) {{ resolve(null); return; }}
+            const c = document.createElement('canvas');
+            c.width  = img.naturalWidth  || img.offsetWidth  || 1024;
+            c.height = img.naturalHeight || img.offsetHeight || 1024;
+            c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+            resolve(c.toDataURL('image/png').split(',')[1]);
+        }});
+    """)
+    if b64:
+        data = _b64.b64decode(b64)
+        with open(out, "wb") as f: f.write(data)
+        _status(f"{tag}✓ {label} saved via canvas ({len(data)//1024}KB)")
+        _delete_chat(driver, _current_chat_url)
+        return {"label": label, "output": out, "error": None}
 
     # Method C: browser fetch
     b64 = driver.execute_script("""
         return new Promise(resolve => {
-            fetch(arguments[0], {credentials: 'include'})
-                .then(r => r.blob())
-                .then(b => { const fr = new FileReader();
-                             fr.onload = () => resolve(fr.result);
-                             fr.readAsDataURL(b); })
-                .catch(e => resolve('ERR:' + e));
+            fetch(arguments[0], {credentials:'include'})
+                .then(r=>r.blob())
+                .then(b=>{const fr=new FileReader();
+                          fr.onload=()=>resolve(fr.result);
+                          fr.readAsDataURL(b);})
+                .catch(e=>resolve(null));
         });
     """, img_src)
     if b64 and b64.startswith("data:image"):
         data = _b64.b64decode(b64.split(",", 1)[1])
         with open(out, "wb") as f: f.write(data)
-        _status(f"{tag}✓ Saved {label} via fetch ({len(data)//1024}KB)")
-        return _finish(label, out)
+        _status(f"{tag}✓ {label} saved via fetch ({len(data)//1024}KB)")
+        _delete_chat(driver, _current_chat_url)
+        return {"label": label, "output": out, "error": None}
+
+    return {"label": label, "output": None, "error": "Gemini: all download methods failed"}
 
     return {"label": label, "output": None, "error": "Gemini: all download methods failed"}

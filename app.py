@@ -715,6 +715,17 @@ def api_ps_progress():
 
 ADMIN_PASSWORD = "Aradhana1992"   # change anytime in app.py
 
+@app.route("/api/upload_bg", methods=["POST"])
+def api_upload_bg():
+    f = request.files.get("file")
+    if not f:
+        return jsonify({"ok": False, "error": "no file"}), 400
+    filename = re.sub(r"[^\w.\-]", "_", f.filename)
+    dest = os.path.join(BACKGROUNDS_DIR, filename)
+    f.save(dest)
+    return jsonify({"ok": True, "filename": filename})
+
+
 @app.route("/api/admin/reset_db", methods=["POST"])
 def api_reset_db():
     pwd = (request.json or {}).get("password", "")

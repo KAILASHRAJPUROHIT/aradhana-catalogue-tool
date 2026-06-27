@@ -526,6 +526,48 @@ async function rejectResult(pairNum, sku) {
   }
 }
 
+let _previewOn = false;
+let _previewTimer = null;
+let _clickMode = false;
+
+function togglePreview() {
+  _previewOn = !_previewOn;
+  document.getElementById('previewSection').style.display = _previewOn ? 'block' : 'none';
+  document.getElementById('previewToggle').textContent = _previewOn ? '👁 Hide Chrome Preview' : '👁 Show Chrome Preview';
+  if (_previewOn) {
+    _refreshPreviews();
+    _previewTimer = setInterval(_refreshPreviews, 1000);
+  } else {
+    clearInterval(_previewTimer);
+  }
+}
+
+async function _refreshPreviews() {
+  for (const port of [9222, 9223]) {
+    const img = document.getElementById(`preview${port}`);
+    if (img) img.src = `/api/chrome_preview?port=${port}&t=${Date.now()}`;
+  }
+}
+
+async function handlePreviewClick(e, port) {
+  const img = e.target;
+  const rect = img.getBoundingClientRect();
+  // Scale click coords from displayed size to actual Chrome window size (1280x900)
+  const scaleX = 1280 / rect.width;
+  const scaleY = 900  / rect.height;
+  const x = Math.round((e.clientX - rect.left) * scaleX);
+  const y = Math.round((e.clientY - rect.top)  * scaleY);
+  const r = await fetch('/api/chrome_click', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({port, x, y})
+  });
+  const j = await r.json();
+  console.log(`Clicked (${x},${y}) on port ${port}:`, j);
+  // Refresh preview immediately after click
+  setTimeout(_refreshPreviews, 300);
+}
+
 async function resetDuplicateDB() {
   const pwd = prompt('Enter admin password to clear duplicate history:');
   if (!pwd) return;

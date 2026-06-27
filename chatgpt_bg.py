@@ -446,8 +446,6 @@ def _upload_with_verify(driver, wait, files, tag=""):
     if not input_el:
         _status(f"{tag}⚠ Input not found after 15s — skipping image upload")
         return
-            _status(f"{tag}⚠ File input fallback failed: {e}")
-        return
 
     input_el.click()
     time.sleep(0.3)

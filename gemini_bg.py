@@ -417,92 +417,50 @@ def process(jewel_path, tag_path, bg_path, category="earrings",
             ActionChains(driver).key_down(Keys.CONTROL).send_keys('v').key_up(Keys.CONTROL).perform()
             time.sleep(0.8)   # let Gemini render the thumbnail
 
-        _status(f"{tag}✅ 3 images pasted")
+        _status(f"{tag}✅ 3 images pasted — typing prompt")
 
-        # ── Step 2: Find the text input ───────────────────────────────────
-        # Gemini uses <rich-textarea> web component with inner contenteditable div
-        # or a plain textarea. Try multiple approaches.
-        input_el = None
-
-        # Primary: rich-textarea inner div (Gemini's custom component)
-        try:
-            input_el = driver.execute_script("""
-                // Try rich-textarea first (Gemini's custom component)
-                const rt = document.querySelector('rich-textarea');
-                if (rt) {
-                    const inner = rt.querySelector('[contenteditable="true"]') ||
-                                  rt.shadowRoot?.querySelector('[contenteditable="true"]');
-                    if (inner) return inner;
-                }
-                // Fallback: any visible contenteditable
-                const ce = Array.from(document.querySelectorAll('[contenteditable="true"]'))
-                    .find(el => el.offsetParent !== null && el.offsetWidth > 100);
-                if (ce) return ce;
-                // Last resort: textarea
-                return document.querySelector('textarea');
-            """)
-        except Exception:
-            pass
-
-        if not input_el:
-            raise Exception("Gemini input box not found")
-
-        _status(f"{tag}  input found — injecting prompt")
-
-        # ── Step 3: Inject prompt text ────────────────────────────────────
-        # Use JavaScript execCommand for reliable text insertion into contenteditable
-        driver.execute_script("arguments[0].focus();", input_el)
-        time.sleep(0.3)
-
-        # Try execCommand first (most reliable for contenteditable)
-        injected = driver.execute_script("""
-            arguments[0].focus();
-            const success = document.execCommand('insertText', false, arguments[1]);
-            if (!success) {
-                // Fallback: dispatch input events manually
-                arguments[0].textContent = arguments[1];
-                arguments[0].dispatchEvent(new Event('input', {bubbles: true}));
-                arguments[0].dispatchEvent(new Event('change', {bubbles: true}));
-            }
-            return arguments[0].textContent.length;
-        """, input_el, prompt)
-        _status(f"{tag}  prompt injected ({injected} chars)")
+        # ── Type prompt using clipboard paste (most reliable for contenteditable) ─
+        import pyperclip
+        pyperclip.copy(prompt)
+        time.sleep(0.2)
+        ActionChains(driver).key_down(Keys.CONTROL).send_keys('v').key_up(Keys.CONTROL).perform()
         time.sleep(0.5)
 
-        # If execCommand failed (returned 0 length), try ActionChains
-        if not injected:
-            _status(f"{tag}  execCommand failed — using ActionChains")
-            ActionChains(driver).move_to_element(input_el).click().send_keys(prompt).perform()
-            time.sleep(0.5)
+        # Verify text appeared, fallback to send_keys if not
+        has_text = driver.execute_script(
+            "return (document.querySelector('[contenteditable]') || {}).textContent || '';")
+        if not has_text or len(has_text.strip()) < 5:
+            _status(f"{tag}  clipboard paste failed — using send_keys")
+            input_el.click()
+            input_el.send_keys(prompt)
+            time.sleep(0.3)
 
-        # ── Step 4: Snapshot existing images before sending ───────────────
+        # ── Snapshot existing images BEFORE sending ───────────────────────
         try:
             _existing_srcs = set(driver.execute_script("""
-                return Array.from(document.querySelectorAll('img'))
-                    .map(i => i.src || i.currentSrc || '')
-                    .filter(s => s.length > 0);
+                function getAll(root) {
+                    let srcs = Array.from(root.querySelectorAll('img')).map(i => i.src || '');
+                    root.querySelectorAll('*').forEach(el => {
+                        if (el.shadowRoot) srcs = srcs.concat(getAll(el.shadowRoot));
+                    });
+                    return srcs;
+                }
+                return getAll(document).filter(s => s.length > 0);
             """) or [])
         except Exception:
             _existing_srcs = set()
 
-        # ── Step 5: Send the message ──────────────────────────────────────
+        # ── Send ─────────────────────────────────────────────────────────
         sent = driver.execute_script("""
-            // Try send button by aria-label
             const byLabel = Array.from(document.querySelectorAll('button')).find(b => {
                 const l = (b.getAttribute('aria-label') || b.title || '').toLowerCase();
-                return l.includes('send') || l.includes('submit') || l === 'send message';
+                return l.includes('send') || l === 'send message' || l.includes('submit');
             });
-            if (byLabel && !byLabel.disabled) { byLabel.click(); return 'aria-label'; }
-
-            // Try send button by data-testid or mat-icon-button
-            const matSend = document.querySelector('button[data-mat-icon-name="send"], button.send-button, button[jsname]');
-            if (matSend && !matSend.disabled) { matSend.click(); return 'mat'; }
-
+            if (byLabel && !byLabel.disabled) { byLabel.click(); return 'button'; }
             return null;
         """)
-
         if not sent:
-            _status(f"{tag}  no send button found — pressing Enter")
+            _status(f"{tag}  pressing Enter")
             input_el.send_keys(Keys.RETURN)
         else:
             _status(f"{tag}  sent via {sent}")

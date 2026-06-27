@@ -1,0 +1,7 @@
+path: C:/Users/kaila/Desktop/JewelleryCatalogTool/dataset
+
+train: images
+val: images
+
+names:
+  0: jewellery

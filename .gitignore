@@ -1,0 +1,56 @@
+# ── Secrets & credentials ─────────────────────────────────────────────────────
+keys.py
+chatgpt_session.json
+*.env
+
+# ── Runtime state (regenerated on every run) ──────────────────────────────────
+port.txt
+slot_log.json
+chatgpt_config.json
+progress_*.json
+catalogue_db.json
+
+# ── Image data (too large for git) ────────────────────────────────────────────
+input/
+output_aradhana/
+processing/
+_input_originals/
+dataset/
+backgrounds/
+*.jpg
+*.jpeg
+*.png
+*.pt
+*.safetensors
+
+# ── Logs & temp ───────────────────────────────────────────────────────────────
+*.log
+*.err
+*.err.log
+*.out.log
+server.log
+server.err
+engine_run.log
+test_out.txt
+
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+
+# ── Chrome & Selenium ─────────────────────────────────────────────────────────
+chromedriver.exe
+
+# ── XML screen dumps ──────────────────────────────────────────────────────────
+*.xml
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Misc ──────────────────────────────────────────────────────────────────────
+Pair/
+tap/
+.agents/

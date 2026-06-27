@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Auto Catalogue Tool — Aradhana Jewellers</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    background: #0d1117;
+    color: #e6edf3;
+    min-height: 100vh;
+  }
+  header {
+    background: #161b22;
+    border-bottom: 1px solid #30363d;
+    padding: 14px 32px;
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+  header h1 {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #c9a84c;
+  }
+  header h1 span { color: #fff; }
+  header small {
+    font-size: 11px;
+    color: #8b949e;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .container { max-width: 900px; margin: 0 auto; padding: 32px 20px; }
+
+  .card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    padding: 22px 26px;
+    margin-bottom: 18px;
+  }
+  .card-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #8b949e;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card-title .num {
+    background: #c9a84c;
+    color: #000;
+    border-radius: 50%;
+    width: 20px; height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 800;
+    flex-shrink: 0;
+  }
+
+  /* Buttons */
+  .btn {
+    display: inline-block;
+    padding: 9px 18px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    transition: opacity 0.15s;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn-gold { background: #c9a84c; color: #000; }
+  .btn-outline { background: transparent; border: 1px solid #30363d; color: #e6edf3; }
+  .btn-outline:hover { border-color: #c9a84c; color: #c9a84c; }
+  .btn-danger { background: #da3633; color: #fff; }
+  .btn-big {
+    padding: 13px 32px;
+    font-size: 15px;
+    letter-spacing: 1px;
+    width: 100%;
+  }
+
+  /* Step 1 — Load */
+  .load-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .load-info { font-size: 13px; color: #8b949e; margin-top: 10px; }
+  .pairs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 10px;
+    margin-top: 14px;
+  }
+  .pair-thumb {
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 8px;
+    font-size: 11px;
+    color: #8b949e;
+    text-align: center;
+  }
+  .pair-thumb img { width: 100%; border-radius: 4px; margin-bottom: 4px; }
+
+  /* Step 2 — Category */
+  select {
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    color: #e6edf3;
+    padding: 9px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    min-width: 200px;
+  }
+  select:focus { outline: none; border-color: #c9a84c; }
+  .cat-confirm { margin-left: 12px; color: #3fb950; font-size: 13px; }
+
+  /* Step 3 — Background */
+  .bg-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 8px;
+    margin-top: 4px;
+  }
+  .bg-thumb {
+    position: relative;
+    cursor: pointer;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 2px solid transparent;
+    transition: border-color 0.15s;
+    aspect-ratio: 1;
+  }
+  .bg-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .bg-thumb .bg-label {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    background: rgba(0,0,0,0.65);
+    font-size: 9px;
+    color: #ccc;
+    text-align: center;
+    padding: 2px 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .bg-thumb.selected { border-color: #c9a84c; }
+  .bg-confirm { margin-top: 8px; color: #3fb950; font-size: 13px; }
+
+  /* Step 4 — Stage */
+  .stage-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .stage-info { font-size: 13px; color: #8b949e; }
+
+  /* Step 5 — Process */
+  .progress-bar-wrap {
+    background: #0d1117;
+    border-radius: 4px;
+    height: 6px;
+    margin: 12px 0 8px;
+    overflow: hidden;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: #c9a84c;
+    border-radius: 4px;
+    transition: width 0.4s ease;
+    width: 0%;
+  }
+  .progress-status {
+    font-size: 12px;
+    color: #8b949e;
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .progress-status .cur { color: #e6edf3; flex: 1; }
+
+  /* Results */
+  .results-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px;
+    margin-top: 14px;
+  }
+  .result-card {
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 8px;
+    font-size: 11px;
+    text-align: center;
+  }
+  .result-card img { width: 100%; border-radius: 4px; margin-bottom: 5px; }
+  .result-card .sku { color: #c9a84c; font-weight: 700; word-break: break-all; }
+  .result-card .err { color: #f85149; word-break: break-all; }
+  .result-card .ok { color: #3fb950; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1><span>AUTO</span> CATALOGUE <span>TOOL</span></h1>
+  <small>Aradhana Jewellers &bull; EST. 1992</small>
+</header>
+
+<div class="container">
+
+  <!-- Step 1: Load -->
+  <div class="card">
+    <div class="card-title"><span class="num">1</span> LOAD BATCH</div>
+    <div class="load-row">
+      <button class="btn btn-gold" onclick="loadFromInput()">Load from input\</button>
+      <label class="btn btn-outline" style="cursor:pointer">
+        Choose files…<input type="file" id="fileInput" multiple accept=".jpg,.jpeg,.png" style="display:none" onchange="uploadFiles(this.files)">
+      </label>
+      <label class="btn btn-outline" style="cursor:pointer">
+        Choose folder…<input type="file" id="folderInput" multiple accept=".jpg,.jpeg,.png" webkitdirectory style="display:none" onchange="uploadFiles(this.files)">
+      </label>
+      <span id="loadInfo" class="load-info"></span>
+    </div>
+    <div id="pairsGrid" class="pairs-grid" style="display:none"></div>
+  </div>
+
+  <!-- Step 2: Category -->
+  <div class="card">
+    <div class="card-title"><span class="num">2</span> ORNAMENT TYPE <span style="color:#da3633;font-size:10px">* required</span></div>
+    <select id="catSelect" onchange="onCatChange()">
+      <option value="">— select type —</option>
+      {% for t in types %}
+      <option value="{{ t }}">{{ t.replace('_',' ').title() }}</option>
+      {% endfor %}
+    </select>
+    <span id="catConfirm" class="cat-confirm"></span>
+  </div>
+
+  <!-- Step 3: Background -->
+  <div class="card">
+    <div class="card-title"><span class="num">3</span> BACKGROUND <span style="font-weight:400;color:#8b949e">(auto-matches category, or pick manually)</span></div>
+    <div id="bgConfirm" class="bg-confirm" style="margin-bottom:8px"></div>
+    <div id="bgGrid" class="bg-grid"></div>
+  </div>
+
+  <!-- Step 4: Stage -->
+  <div class="card">
+    <div class="card-title"><span class="num">4</span> RENAME &amp; STAGE <span style="font-weight:400;color:#8b949e">(optional)</span></div>
+    <div class="stage-row">
+      <button class="btn btn-outline" onclick="stageFiles()">Rename &amp; move to processing\</button>
+      <span id="stageInfo" class="stage-info"></span>
+    </div>
+    <div id="stagedGrid" class="pairs-grid" style="display:none;margin-top:12px"></div>
+  </div>
+
+  <!-- Step 5: Process -->
+  <div class="card">
+    <div class="card-title"><span class="num">5</span> PROCESS</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-gold btn-big" id="runBtn" onclick="runChatGPT()" style="flex:1">
+        &#9654; Process with ChatGPT
+      </button>
+      <button class="btn btn-outline btn-big" id="psBtn" onclick="runPhotoshop()" style="flex:1">
+        &#9654; Process with Photoshop
+      </button>
+      <button class="btn btn-outline" onclick="newChat()" title="Force a fresh ChatGPT conversation" style="padding:13px 16px;font-size:13px">
+        &#x1F504; New Chat
+      </button>
+    </div>
+    <div class="progress-bar-wrap" id="progressWrap" style="display:none">
+      <div class="progress-bar-fill" id="progressFill"></div>
+    </div>
+    <div class="progress-status" id="progressStatus" style="display:none">
+      <span class="cur" id="statusCur">Starting…</span>
+      <span id="statusCount"></span>
+      <span id="statusEta"></span>
+      <span id="statusElapsed"></span>
+      <span id="statusSlots" style="color:#f7ca5b;font-size:12px;margin-left:8px"></span>
+    </div>
+    <div id="resultsGrid" class="results-grid" style="display:none"></div>
+  </div>
+
+</div>
+
+<script>
+let _pairs   = [];
+let _staged  = [];
+let _selBg   = "";
+let _polling = null;
+
+// ── Step 1: Load ──────────────────────────────────────────────────────────────
+
+async function loadFromInput() {
+  const r = await fetch('/api/load').then(x => x.json());
+  _pairs = r.pairs || [];
+  showPairs(_pairs, 'pairsGrid', 'input');
+  document.getElementById('loadInfo').textContent =
+    `${r.count} photos · ${_pairs.length} pair(s)`;
+}
+
+async function uploadFiles(files) {
+  if (!files.length) return;
+  document.getElementById('loadInfo').textContent = 'Uploading…';
+  const fd = new FormData();
+  for (const f of files) fd.append('files', f);
+  await fetch('/api/upload', {method:'POST', body:fd});
+  await loadFromInput();
+}
+
+function showPairs(pairs, gridId, folder) {
+  const g = document.getElementById(gridId);
+  g.innerHTML = '';
+  pairs.forEach(p => {
+    const d = document.createElement('div');
+    d.className = 'pair-thumb';
+    const src = p.jewel ? `/img/${folder}/${p.jewel}` : '';
+    d.innerHTML = src
+      ? `<img src="${src}" onerror="this.style.display='none'">`
+      : '';
+    d.innerHTML += `<div>${p.jewel || '—'}</div><div style="color:#555">${p.tag || 'no tag'}</div>`;
+    g.appendChild(d);
+  });
+  g.style.display = pairs.length ? 'grid' : 'none';
+}
+
+// ── Step 2: Category ──────────────────────────────────────────────────────────
+
+function onCatChange() {
+  const v = document.getElementById('catSelect').value;
+  document.getElementById('catConfirm').textContent = v ? '✓ ' + v.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()) : '';
+  autoSelectBg(v);
+}
+
+// ── Step 3: Background ────────────────────────────────────────────────────────
+
+(async function loadBgs() {
+  const r = await fetch('/api/backgrounds').then(x => x.json());
+  const grid = document.getElementById('bgGrid');
+  grid.innerHTML = '';
+  (r.backgrounds || []).forEach(bg => {
+    const d = document.createElement('div');
+    d.className = 'bg-thumb';
+    d.dataset.bg = bg;
+    d.innerHTML = `<img src="/img/backgrounds/${bg}" onerror="this.style.display='none'">
+                   <div class="bg-label">${bg.replace('.png','')}</div>`;
+    d.onclick = () => selectBg(bg);
+    grid.appendChild(d);
+  });
+})();
+
+function selectBg(bg) {
+  _selBg = bg;
+  document.querySelectorAll('.bg-thumb').forEach(d => {
+    d.classList.toggle('selected', d.dataset.bg === bg);
+  });
+  document.getElementById('bgConfirm').textContent = '✓ Background: ' + bg.replace('.png','');
+}
+
+function autoSelectBg(cat) {
+  if (!cat) return;
+  const name = cat + '.png';
+  const el = document.querySelector(`.bg-thumb[data-bg="${name}"]`);
+  if (el) selectBg(name);
+}
+
+// ── Step 4: Stage ─────────────────────────────────────────────────────────────
+
+async function stageFiles() {
+  const r = await fetch('/api/stage', {method:'POST'}).then(x => x.json());
+  _staged = r.staged || [];
+  document.getElementById('stageInfo').textContent =
+    `Staged ${_staged.length} pair(s) to processing\\`;
+  showPairs(_staged, 'stagedGrid', 'processing');
+  document.getElementById('stagedGrid').style.display = _staged.length ? 'grid' : 'none';
+  // Clear loaded pairs display
+  document.getElementById('pairsGrid').style.display = 'none';
+  document.getElementById('loadInfo').textContent = '';
+}
+
+// ── Step 5: Process ───────────────────────────────────────────────────────────
+
+async function newChat() {
+  if (!confirm('Start a fresh ChatGPT conversation? (clears saved chat)')) return;
+  await fetch('/api/new_chat', {method:'POST'});
+  alert('Done — next run will open a brand new chat.');
+}
+
+async function runPhotoshop() {
+  const cat = document.getElementById('catSelect').value;
+  if (!cat) { alert('Select ornament type first.'); return; }
+  const pairs = _staged.length ? _staged : _pairs;
+  if (!pairs.length) { alert('No pairs loaded.'); return; }
+
+  document.getElementById('psBtn').disabled = true;
+  document.getElementById('runBtn').disabled = true;
+  document.getElementById('progressWrap').style.display = 'block';
+  document.getElementById('progressStatus').style.display = 'flex';
+  document.getElementById('statusCur').textContent = 'Starting Photoshop…';
+  document.getElementById('resultsGrid').style.display = 'none';
+
+  await fetch('/api/ps_run', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({pairs, category: cat, bg: _selBg})
+  });
+
+  if (_polling) clearInterval(_polling);
+  _polling = setInterval(async () => {
+    let j;
+    try { j = await fetch('/api/ps_progress').then(x => x.json()); } catch { return; }
+    const pct = j.total > 0 ? Math.round((j.done / j.total) * 100) : 0;
+    document.getElementById('progressFill').style.width = pct + '%';
+    document.getElementById('statusCur').textContent   = j.current || '';
+    document.getElementById('statusCount').textContent = `${j.done}/${j.total} · ${pct}%`;
+    document.getElementById('statusEta').textContent   = j.eta != null ? `ETA ${fmt(j.eta)}` : 'ETA —';
+    document.getElementById('statusElapsed').textContent = `${fmt(j.elapsed)} elapsed`;
+    if (j.results && j.results.length) showResults(j.results);
+    if (!j.running) {
+      clearInterval(_polling); _polling = null;
+      document.getElementById('psBtn').disabled = false;
+      document.getElementById('runBtn').disabled = false;
+      document.getElementById('progressFill').style.width = '100%';
+    }
+  }, 1500);
+}
+
+async function runChatGPT() {
+  const cat = document.getElementById('catSelect').value;
+  if (!cat) { alert('Select ornament type first.'); return; }
+
+  const pairs = _staged.length ? _staged : _pairs;
+  if (!pairs.length) { alert('No pairs loaded. Load images first.'); return; }
+
+  document.getElementById('runBtn').disabled = true;
+  document.getElementById('progressWrap').style.display = 'block';
+  document.getElementById('progressStatus').style.display = 'flex';
+  document.getElementById('resultsGrid').style.display = 'none';
+
+  await fetch('/api/chatgpt_run', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({pairs, category: cat, bg: _selBg})
+  });
+
+  startPolling();
+}
+
+function startPolling() {
+  if (_polling) clearInterval(_polling);
+  _polling = setInterval(pollProgress, 1500);
+}
+
+async function pollProgress() {
+  let j;
+  try { j = await fetch('/api/chatgpt_progress').then(x => x.json()); }
+  catch { return; }
+
+  const pct = j.total > 0 ? Math.round((j.done / j.total) * 100) : 0;
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('statusCur').textContent   = j.current || '';
+  document.getElementById('statusCount').textContent = `${j.done}/${j.total} · ${pct}%`;
+
+  const eta = j.eta != null ? `ETA ${fmt(j.eta)}` : 'ETA —';
+  document.getElementById('statusEta').textContent     = eta;
+  document.getElementById('statusElapsed').textContent = `${fmt(j.elapsed)} elapsed`;
+  if (j.slots) document.getElementById('statusSlots').textContent = j.slots;
+
+  if (j.results && j.results.length) showResults(j.results, j.done, j.total);
+
+  if (!j.running) {
+    clearInterval(_polling);
+    _polling = null;
+    document.getElementById('runBtn').disabled = false;
+    document.getElementById('progressFill').style.width = '100%';
+  }
+}
+
+function fmt(s) {
+  if (s == null) return '—';
+  const m = Math.floor(s / 60), sec = s % 60;
+  return m > 0 ? `${m}m ${sec}s` : `${sec}s`;
+}
+
+function showResults(results, done, total) {
+  const g = document.getElementById('resultsGrid');
+  g.style.display = 'grid';
+  g.innerHTML = '';
+  results.forEach(r => {
+    const d = document.createElement('div');
+    d.className = 'result-card';
+
+    if (r.output && r.duplicate) {
+      const typeColors = {
+        exact_duplicate:      '#f85149',
+        same_tag_diff_design: '#f0a500',
+        same_design_diff_tag: '#a371f7',
+      };
+      const typeLabels = {
+        exact_duplicate:      '⛔ EXACT DUPLICATE',
+        same_tag_diff_design: '⚠ SAME TAG — DIFFERENT DESIGN',
+        same_design_diff_tag: '⚠ SAME DESIGN — DIFFERENT TAG',
+      };
+      const col = typeColors[r.duplicate_type] || '#f0a500';
+      const lbl = typeLabels[r.duplicate_type] || '⚠ FLAGGED';
+      // Show each finding separately
+      const findingHtml = (r.findings || []).map(f =>
+        `<div style="color:#8b8b8b;font-size:10px;margin-top:3px;word-break:break-all">${f.message}</div>`
+      ).join('');
+      d.style.border = `2px solid ${col}`;
+      d.innerHTML = `<img src="/img/output/${r.output}" onerror="this.style.display='none'">
+                     <div class="sku">${r.sku || '—'}</div>
+                     <div style="color:${col};font-size:11px;font-weight:700">${lbl}</div>
+                     ${findingHtml}`;
+    } else if (r.output) {
+      d.innerHTML = `<img src="/img/output/${r.output}" onerror="this.style.display='none'">
+                     <div class="sku">${r.sku || '—'}</div>
+                     <div class="ok">✓ saved</div>`;
+    } else if (r.skipped) {
+      d.style.opacity = '0.5';
+      d.innerHTML = `<div class="sku">${r.sku || '—'}</div>
+                     <div style="color:#8b8b8b">⏭ skipped (resumed)</div>`;
+    } else {
+      d.innerHTML = `<div class="sku">Pair ${r.pair}</div>
+                     <div class="err">${r.error || 'failed'}</div>`;
+    }
+    g.appendChild(d);
+  });
+}
+</script>
+</body>
+</html>

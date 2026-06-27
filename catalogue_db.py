@@ -47,6 +47,75 @@ def _phash(path):
         return None
 
 
+def _gemma_same_design(path_a: str, path_b: str) -> dict:
+    """
+    Use Gemma 4 VLM to compare the actual jewellery design in two catalogue images.
+    Ignores background — focuses entirely on the jewellery pieces themselves.
+    Returns {"same": bool, "confidence": "high"|"medium"|"low", "reason": str}
+    """
+    try:
+        from google import genai
+        from google.genai import types as gt
+        from PIL import Image
+        import io, sys
+        sys.path.insert(0, os.path.dirname(__file__))
+        from keys import GEMINI_API_KEY
+
+        client = genai.Client(api_key=GEMINI_API_KEY)
+
+        def _img_part(p):
+            img = Image.open(p).convert("RGB")
+            img.thumbnail((768, 768))
+            buf = io.BytesIO()
+            img.save(buf, "JPEG", quality=90)
+            return gt.Part.from_bytes(data=buf.getvalue(), mime_type="image/jpeg")
+
+        resp = client.models.generate_content(
+            model="gemma-4-31b-it",
+            contents=[
+                _img_part(path_a),
+                _img_part(path_b),
+                """You are a jewellery expert comparing two catalogue product images.
+
+TASK: Determine if Image A and Image B show THE EXACT SAME jewellery design.
+
+FOCUS ONLY ON the jewellery pieces themselves — ignore:
+- The background (satin, velvet, studio backdrop)
+- Lighting differences
+- Slight angle differences
+- Image quality differences
+
+EXAMINE CLOSELY:
+- Shape and silhouette of each piece
+- Stone placement, colour and cut
+- Metal pattern, texture and finish
+- Dangles, drops or pendants
+- Overall construction details
+
+Answer in this exact format:
+SAME_DESIGN: YES or NO
+CONFIDENCE: HIGH or MEDIUM or LOW
+REASON: [one sentence explaining what matches or differs in the jewellery design itself]"""
+            ]
+        )
+
+        text = resp.text.strip()
+        same       = "SAME_DESIGN: YES" in text.upper()
+        confidence = "high" if "CONFIDENCE: HIGH" in text.upper() else \
+                     "medium" if "CONFIDENCE: MEDIUM" in text.upper() else "low"
+        reason     = ""
+        for line in text.split("\n"):
+            if line.upper().startswith("REASON:"):
+                reason = line.split(":", 1)[1].strip()
+                break
+
+        return {"same": same, "confidence": confidence, "reason": reason}
+
+    except Exception as e:
+        # Gemma unavailable — fall back to hash-only decision
+        return {"same": None, "confidence": "low", "reason": f"Gemma unavailable: {e}"}
+
+
 def _hash_dist(h1_str, h2_str):
     try:
         import imagehash

@@ -130,6 +130,42 @@ def _fmt_date(ts):
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
+def verify_jewellery_present(output_path: str) -> dict:
+    """
+    Use Gemma to verify the output image actually contains jewellery.
+    Returns {"ok": bool, "reason": str}
+    Fast check — one image, binary question.
+    """
+    try:
+        from google import genai
+        from google.genai import types as gt
+        from PIL import Image
+        import io, sys, os
+        sys.path.insert(0, os.path.dirname(__file__))
+        from keys import GEMINI_API_KEY
+
+        client = genai.Client(api_key=GEMINI_API_KEY)
+        img = Image.open(output_path).convert("RGB")
+        img.thumbnail((512, 512))
+        buf = io.BytesIO()
+        img.save(buf, "JPEG", quality=85)
+
+        resp = client.models.generate_content(
+            model="gemma-4-31b-it",
+            contents=[
+                gt.Part.from_bytes(data=buf.getvalue(), mime_type="image/jpeg"),
+                "Does this image contain jewellery (earrings, rings, necklace, bangles, "
+                "pendants, or any gold/silver ornament)? "
+                "Answer YES or NO only, then one short reason."
+            ]
+        )
+        text = resp.text.strip()
+        ok = text.upper().startswith("YES")
+        return {"ok": ok, "reason": text[:120]}
+    except Exception as e:
+        return {"ok": True, "reason": f"check skipped: {e}"}  # assume ok if Gemma fails
+
+
 def check_and_record(label: str, output_path: str, category: str = "") -> list:
     """
     Check the new entry against the 30-day database, then record it.

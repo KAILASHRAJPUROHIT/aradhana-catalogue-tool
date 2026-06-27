@@ -92,15 +92,16 @@ _GEMINI_CHROME_PID = None
 
 
 def _find_gemini_hwnds():
-    if not _GEMINI_CHROME_PID:
-        return []
+    """Find Gemini Chrome windows by page title — never matches user's personal Chrome."""
     import ctypes, ctypes.wintypes
     u32 = ctypes.windll.user32
     found = []
     def _cb(h, _):
-        pid = ctypes.wintypes.DWORD(0)
-        u32.GetWindowThreadProcessId(h, ctypes.byref(pid))
-        if pid.value == _GEMINI_CHROME_PID and u32.IsWindowVisible(h):
+        if not u32.IsWindowVisible(h): return True
+        buf = ctypes.create_unicode_buffer(512)
+        u32.GetWindowTextW(h, buf, 512)
+        t = buf.value.lower()
+        if "gemini" in t or "gemini.google.com" in t:
             found.append(h)
         return True
     u32.EnumWindows(ctypes.WINFUNCTYPE(ctypes.c_bool,
@@ -108,7 +109,7 @@ def _find_gemini_hwnds():
     return found
 
 def _chrome_to_background():
-    """Push ONLY our Gemini Chrome behind other windows."""
+    """Push our Gemini Chrome behind other windows."""
     try:
         import ctypes
         u32 = ctypes.windll.user32
@@ -119,7 +120,7 @@ def _chrome_to_background():
         pass
 
 def _chrome_to_foreground():
-    """Reveal ONLY our Gemini Chrome for login."""
+    """Reveal our Gemini Chrome for login only."""
     try:
         import ctypes
         u32 = ctypes.windll.user32

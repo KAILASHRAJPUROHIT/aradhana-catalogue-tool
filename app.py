@@ -804,6 +804,58 @@ def api_reset_db():
     return jsonify({"ok": True, "message": "Duplicate history cleared"})
 
 
+@app.route("/api/chrome_preview")
+def api_chrome_preview():
+    """Live screenshot from any connected Chrome debug port."""
+    from flask import Response
+    import base64
+    port = request.args.get("port", "9222")
+    try:
+        from selenium import webdriver
+        from selenium.webdriver.chrome.options import Options
+        from selenium.webdriver.chrome.service import Service as _Svc
+        _cd = os.path.join(BASE, "chromedriver.exe")
+        _svc = _Svc(_cd) if os.path.exists(_cd) else None
+        opts = Options()
+        opts.add_experimental_option("debuggerAddress", f"127.0.0.1:{port}")
+        drv = webdriver.Chrome(service=_svc, options=opts) if _svc else webdriver.Chrome(options=opts)
+        png = drv.get_screenshot_as_png()
+        return Response(png, mimetype="image/png",
+                        headers={"Cache-Control": "no-store"})
+    except Exception as e:
+        # Return a 1×1 grey PNG on error
+        import struct, zlib
+        def _make_grey():
+            raw = b'\x00\x80\x80\x80'
+            compressed = zlib.compress(raw)
+            def chunk(t, d): return struct.pack('>I', len(d)) + t + d + struct.pack('>I', zlib.crc32(t + d) & 0xffffffff)
+            return b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', 1, 1, 8, 2, 0, 0, 0)) + chunk(b'IDAT', compressed) + chunk(b'IEND', b'')
+        return Response(_make_grey(), mimetype="image/png",
+                        headers={"Cache-Control": "no-store", "X-Error": str(e)})
+
+
+@app.route("/api/chrome_click", methods=["POST"])
+def api_chrome_click():
+    """Click at x,y coordinates in the Chrome tab using CDP."""
+    data = request.json or {}
+    port = data.get("port", "9222")
+    x, y = data.get("x", 0), data.get("y", 0)
+    try:
+        from selenium import webdriver
+        from selenium.webdriver.chrome.options import Options
+        from selenium.webdriver.chrome.service import Service as _Svc
+        _cd = os.path.join(BASE, "chromedriver.exe")
+        _svc = _Svc(_cd) if os.path.exists(_cd) else None
+        opts = Options()
+        opts.add_experimental_option("debuggerAddress", f"127.0.0.1:{port}")
+        drv = webdriver.Chrome(service=_svc, options=opts) if _svc else webdriver.Chrome(options=opts)
+        drv.execute_cdp_cmd("Input.dispatchMouseEvent", {"type": "mousePressed", "x": x, "y": y, "button": "left", "clickCount": 1})
+        drv.execute_cdp_cmd("Input.dispatchMouseEvent", {"type": "mouseReleased", "x": x, "y": y, "button": "left", "clickCount": 1})
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)})
+
+
 @app.route("/api/stop", methods=["POST"])
 def api_stop():
     CGPT_JOB["running"]   = False

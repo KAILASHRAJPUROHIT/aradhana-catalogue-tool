@@ -421,41 +421,83 @@ def process(jewel_path, tag_path, bg_path, category="earrings",
     _cdp_click(driver, *_C['input'])
     time.sleep(0.5)
 
-    # ── 3. Inject 3 images via ClipboardEvent into the focused Quill editor ──
-    _status(f"{tag}📎 Injecting 3 images")
+    # ── 3. Upload images via native file input (same path as manual upload) ──
+    # Intercept the file input's click() to prevent OS dialog, then send_keys.
+    # This gives Gemini proper multimodal file inputs — identical to manual upload.
+    _status(f"{tag}📎 Uploading 3 images via native file input")
 
-    def _inject_image(img_path, idx):
-        from PIL import Image as _PIL
-        import io as _io
-        img = _PIL.open(img_path).convert("RGB")
-        img.thumbnail((1024, 1024))
-        buf = _io.BytesIO()
-        img.save(buf, "JPEG", quality=88)
-        b64 = _b64.b64encode(buf.getvalue()).decode()
-        return driver.execute_script("""
-            const b64 = arguments[0], fname = arguments[1];
-            const binary = atob(b64);
-            const bytes = new Uint8Array(binary.length);
-            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-            const file = new File([bytes], fname, {type:'image/jpeg'});
-            const editor = document.querySelector('rich-textarea .ql-editor');
-            if (!editor) return 'no-editor';
-            editor.focus();
-            const dt = new DataTransfer();
-            dt.items.add(file);
-            editor.dispatchEvent(new ClipboardEvent('paste',
-                {bubbles:true, cancelable:true, clipboardData:dt}));
-            return 'ok';
-        """, b64, f"img{idx}.jpg")
+    all_paths = "\n".join(os.path.abspath(p) for p in [jewel_path, tag_path, bg_path])
 
-    pasted = 0
-    for idx, img_path in enumerate([jewel_path, tag_path, bg_path], 1):
-        res = _inject_image(img_path, idx)
-        _status(f"{tag}  img {idx}/3 → {res}")
+    def _native_upload():
+        # Step 1: intercept file input click so OS dialog never opens
+        driver.execute_script("""
+            window._origClick = HTMLInputElement.prototype.click;
+            window._fileInputEl = null;
+            HTMLInputElement.prototype.click = function() {
+                if (this.type === 'file') {
+                    window._fileInputEl = this;
+                    return;   // swallow OS dialog
+                }
+                return window._origClick.call(this);
+            };
+        """)
+
+        # Step 2: click the + button to trigger the upload menu
+        _cdp_click(driver, *_C['upload'])
+        time.sleep(1.0)
+
+        # Step 3: click the first menu item that says upload/image/file
+        clicked_menu = driver.execute_script("""
+            const overlay = document.querySelector('.cdk-overlay-container');
+            if (!overlay) return 'no-overlay';
+            const items = Array.from(overlay.querySelectorAll(
+                '[role=menuitem],[role=option],button,mat-list-item,mat-option'));
+            const upload = items.find(el => {
+                const t = (el.textContent || '').toLowerCase();
+                return t.includes('upload') || t.includes('image') ||
+                       t.includes('photo') || t.includes('file') ||
+                       t.includes('computer');
+            });
+            if (upload) { upload.click(); return upload.textContent.trim().substring(0,30); }
+            // fallback: try first list item
+            if (items[0]) { items[0].click(); return 'first-item:' + items[0].textContent.trim().substring(0,20); }
+            return 'no-menu-item';
+        """)
+        _status(f"{tag}  menu click: {clicked_menu}")
         time.sleep(0.8)
-        if res == "ok":
-            pasted += 1
-    _status(f"{tag}  {pasted}/3 images injected")
+
+        # Step 4: retrieve the intercepted file input and send our paths
+        fi = driver.execute_script("return window._fileInputEl;")
+        if fi:
+            # Restore original click
+            driver.execute_script("""
+                if (window._origClick) HTMLInputElement.prototype.click = window._origClick;
+            """)
+            # Make visible and send paths
+            driver.execute_script("""
+                arguments[0].style.cssText = 'display:block!important;visibility:visible!important;';
+            """, fi)
+            fi.send_keys(all_paths)
+            return True
+
+        # Step 5: fallback — find any file input in DOM directly
+        driver.execute_script("""
+            if (window._origClick) HTMLInputElement.prototype.click = window._origClick;
+        """)
+        inputs = driver.find_elements(By.CSS_SELECTOR, 'input[type="file"]')
+        for inp in inputs:
+            try:
+                driver.execute_script(
+                    "arguments[0].style.cssText='display:block!important;visibility:visible!important;';", inp)
+                inp.send_keys(all_paths)
+                return True
+            except Exception:
+                pass
+        return False
+
+    uploaded = _native_upload()
+    _status(f"{tag}  upload: {'✅ ok' if uploaded else '⚠ failed'}")
+    time.sleep(2.0)   # let Gemini process and show thumbnails
 
     # ── 4. Type prompt via CDP insertText (no DOM query needed) ──────────────
     _filename = os.path.splitext(os.path.basename(jewel_path))[0]

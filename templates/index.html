@@ -432,6 +432,55 @@ async function runGemini() {
   _polling = setInterval(pollChatGPT, 1500);
 }
 
+async function runCompare() {
+  const cat = document.getElementById('catSelect').value;
+  if (!cat) { alert('Select ornament type first.'); return; }
+  const bg = document.getElementById('bgSelect')?.value || '';
+  document.getElementById('compareBtn').disabled = true;
+  document.getElementById('comparePanel').style.display = 'block';
+  document.getElementById('cgptStatus').textContent = '⏳ ChatGPT generating…';
+  document.getElementById('gemStatus').textContent  = '⏳ Gemini generating…';
+  document.getElementById('cgptImg').style.display  = 'none';
+  document.getElementById('gemImg').style.display   = 'none';
+  document.getElementById('cgptErr').style.display  = 'none';
+  document.getElementById('gemErr').style.display   = 'none';
+  await fetch('/api/compare_test', {method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({category: cat, bg})});
+  // Poll for results
+  const poll = setInterval(async () => {
+    const j = await fetch('/api/compare_progress').then(r => r.json());
+    if (j.chatgpt_done) {
+      if (j.chatgpt_output) {
+        document.getElementById('cgptStatus').textContent = '✅ Done';
+        const img = document.getElementById('cgptImg');
+        img.src = '/img/output/' + j.chatgpt_output + '?t=' + Date.now();
+        img.style.display = 'block';
+      } else {
+        document.getElementById('cgptStatus').textContent = '❌ Failed';
+        document.getElementById('cgptErr').textContent = j.chatgpt_error || '';
+        document.getElementById('cgptErr').style.display = 'block';
+      }
+    }
+    if (j.gemini_done) {
+      if (j.gemini_output) {
+        document.getElementById('gemStatus').textContent = '✅ Done';
+        const img = document.getElementById('gemImg');
+        img.src = '/img/output/' + j.gemini_output + '?t=' + Date.now();
+        img.style.display = 'block';
+      } else {
+        document.getElementById('gemStatus').textContent = '❌ Failed';
+        document.getElementById('gemErr').textContent = j.gemini_error || '';
+        document.getElementById('gemErr').style.display = 'block';
+      }
+    }
+    if (!j.running) {
+      clearInterval(poll);
+      document.getElementById('compareBtn').disabled = false;
+    }
+  }, 2000);
+}
+
 async function runParallel() {
   const cat = document.getElementById('catSelect').value;
   if (!cat) { alert('Select ornament type first.'); return; }

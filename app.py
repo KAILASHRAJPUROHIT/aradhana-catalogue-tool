@@ -179,7 +179,7 @@ def _bg_for(category):
     return path if os.path.exists(path) else os.path.join(BACKGROUNDS_DIR, "earrings.png")
 
 def _ensure_chrome():
-    """Launch ChatGPT-dedicated Chrome on port 9222. Opens directly on chatgpt.com."""
+    """Launch ChatGPT-dedicated Chrome on port 9222, then move it to catalogue desktop."""
     import socket as _s, subprocess
     try:
         c = _s.create_connection(("127.0.0.1", 9222), timeout=2)
@@ -194,9 +194,14 @@ def _ensure_chrome():
         r"--user-data-dir=C:\Users\kaila\AppData\Local\AutoCatalogueChrome",
         "--no-first-run", "--no-default-browser-check",
         "--homepage=https://chatgpt.com",
-        "https://chatgpt.com",          # opens this URL on launch
+        "https://chatgpt.com",
     ])
     import time as _t; _t.sleep(6)
+    try:
+        import vdesk
+        vdesk.push_chrome_to_catalogue_desktop()
+    except Exception as e:
+        print(f"vdesk: {e}")
     return False
 
 def _gemma_read_tag(tag_path):

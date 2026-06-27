@@ -111,21 +111,35 @@ def _find_gemini_hwnds():
     return found
 
 def _chrome_to_background():
-    """Move Gemini Chrome back off-screen."""
-    try:
-        import ctypes
-        u32 = ctypes.windll.user32
-        for h in _find_gemini_hwnds():
-            u32.SetWindowPos(h, 0, -32000, -32000, 1280, 900, 0x0010)
-    except Exception:
-        pass
+    """No-op — Gemini Chrome stays off-screen via --window-position launch flag."""
+    pass
 
 def _chrome_to_foreground():
-    """Move Gemini Chrome on-screen for login only."""
+    """Move ONLY our Gemini Chrome on-screen for login using cmdline identification."""
     try:
-        import ctypes
+        import ctypes, psutil
         u32 = ctypes.windll.user32
-        for h in _find_gemini_hwnds():
+        our_pids = set()
+        for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+            try:
+                if 'chrome' in (proc.info['name'] or '').lower():
+                    cmd = ' '.join(proc.info['cmdline'] or [])
+                    if 'GeminiCatalogChrome' in cmd:
+                        our_pids.add(proc.info['pid'])
+            except Exception:
+                pass
+        if not our_pids:
+            return
+        found = []
+        def _cb(hwnd, _):
+            pid = ctypes.wintypes.DWORD(0)
+            u32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+            if pid.value in our_pids:
+                found.append(hwnd)
+            return True
+        u32.EnumWindows(ctypes.WINFUNCTYPE(ctypes.c_bool,
+            ctypes.wintypes.HWND, ctypes.wintypes.LPARAM)(_cb), 0)
+        for h in found:
             u32.SetWindowPos(h, 0, 100, 100, 1280, 900, 0x0010)
             u32.ShowWindow(h, 9)
             u32.SetForegroundWindow(h)

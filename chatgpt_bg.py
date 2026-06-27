@@ -1027,15 +1027,20 @@ def process(jewel_path, tag_path, bg_path, is_first=False, category="jewellery",
     time.sleep(0.5)
 
     # Wait for input to be ready (not locked by previous generation)
-    _status(f"{tag}✍️ Sending prompt")
+    _status(f"{tag}✍️ Sending prompt via clipboard paste")
     try:
+        import pyperclip
         inp = _wait_for_input_ready(driver, wait, tag)
         driver.execute_script("arguments[0].click(); arguments[0].focus();", inp)
-        time.sleep(0.4)
-        inp.send_keys(prompt); time.sleep(0.6)
-        # Try clicking send button first, fall back to RETURN
+        time.sleep(0.3)
+        # Paste prompt via clipboard — avoids character-by-character send_keys slowness
+        pyperclip.copy(prompt)
+        ActionChains(driver).key_down(Keys.CONTROL).send_keys('v').key_up(Keys.CONTROL).perform()
+        time.sleep(0.5)
+        # Try clicking send button, fall back to Enter
         sent = driver.execute_script("""
-            const btn = document.querySelector('button[data-testid="send-button"], button[aria-label*="Send"]');
+            const btn = document.querySelector(
+                'button[data-testid="send-button"], button[aria-label*="Send"]');
             if (btn && !btn.disabled) { btn.click(); return true; }
             return false;
         """)

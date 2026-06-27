@@ -343,63 +343,116 @@ def process(jewel_path, tag_path, bg_path, category="earrings",
     prompt = build_prompt(category, _jid, filename=_filename)
     files  = [make_unique(p) for p in [jewel_path, tag_path, bg_path]]
 
-    _status(f"{tag}📎 Uploading 3 images to Gemini")
+    _status(f"{tag}📎 Uploading images + typing prompt into Gemini")
 
     try:
-        wait = WebDriverWait(driver, 30)
+        # ── Step 1: Upload files via hidden file input ─────────────────────
+        # Gemini has a hidden input[type=file] — expose and send paths directly
+        all_paths = "\n".join(os.path.abspath(f) for f in files)
 
-        # Find file input — Gemini uses a hidden input[type=file]
+        # Try to find any file input on page
         file_input = None
-        for sel in ['input[type="file"]', 'input[accept*="image"]']:
-            try:
-                file_input = driver.find_element(By.CSS_SELECTOR, sel)
-                break
-            except Exception:
-                pass
-
-        if file_input:
-            driver.execute_script("arguments[0].style.display='block';", file_input)
-            file_input.send_keys("\n".join(os.path.abspath(f) for f in files))
-            time.sleep(2)
-        else:
-            # Click the + / attachment button to reveal file input
-            attach_btn = driver.execute_script("""
-                return Array.from(document.querySelectorAll('button')).find(b => {
-                    const l = (b.getAttribute('aria-label') || b.title || '').toLowerCase();
-                    return l.includes('attach') || l.includes('upload') || l.includes('add image') || l.includes('image');
-                });
-            """)
-            if attach_btn:
-                attach_btn.click()
-                time.sleep(1)
-                file_input = driver.find_element(By.CSS_SELECTOR, 'input[type="file"]')
-                driver.execute_script("arguments[0].style.display='block';", file_input)
-                file_input.send_keys("\n".join(os.path.abspath(f) for f in files))
-                time.sleep(2)
-
-        # Find text input and type prompt
-        input_el = None
-        for sel in ['div[contenteditable="true"]', 'textarea', 'div.ql-editor', 'p[data-placeholder]']:
+        for sel in ['input[type="file"]', 'input[accept*="image"]', 'input[accept*="*"]']:
             try:
                 els = driver.find_elements(By.CSS_SELECTOR, sel)
-                for el in els:
-                    if el.is_displayed():
-                        input_el = el
-                        break
-                if input_el:
+                if els:
+                    file_input = els[0]
                     break
             except Exception:
                 pass
 
+        if not file_input:
+            # Click the + (add) button to reveal file options
+            _status(f"{tag}  clicking + button to reveal file upload")
+            driver.execute_script("""
+                const btn = Array.from(document.querySelectorAll('button')).find(b => {
+                    const l = (b.getAttribute('aria-label') || b.textContent || b.title || '').trim();
+                    return l === '+' || l.toLowerCase().includes('add') ||
+                           l.toLowerCase().includes('attach') || l.toLowerCase().includes('more');
+                });
+                if (btn) btn.click();
+            """)
+            time.sleep(1)
+            # Look for file input again after menu opens
+            for sel in ['input[type="file"]']:
+                try:
+                    els = driver.find_elements(By.CSS_SELECTOR, sel)
+                    if els:
+                        file_input = els[0]
+                        break
+                except Exception:
+                    pass
+
+        if file_input:
+            driver.execute_script("""
+                arguments[0].style.display = 'block';
+                arguments[0].style.visibility = 'visible';
+                arguments[0].style.opacity = '1';
+            """, file_input)
+            time.sleep(0.3)
+            file_input.send_keys(all_paths)
+            _status(f"{tag}  files sent to input")
+            time.sleep(2)
+        else:
+            _status(f"{tag}⚠️ No file input found — continuing without images")
+
+        # ── Step 2: Find the text input ───────────────────────────────────
+        # Gemini uses <rich-textarea> web component with inner contenteditable div
+        # or a plain textarea. Try multiple approaches.
+        input_el = None
+
+        # Primary: rich-textarea inner div (Gemini's custom component)
+        try:
+            input_el = driver.execute_script("""
+                // Try rich-textarea first (Gemini's custom component)
+                const rt = document.querySelector('rich-textarea');
+                if (rt) {
+                    const inner = rt.querySelector('[contenteditable="true"]') ||
+                                  rt.shadowRoot?.querySelector('[contenteditable="true"]');
+                    if (inner) return inner;
+                }
+                // Fallback: any visible contenteditable
+                const ce = Array.from(document.querySelectorAll('[contenteditable="true"]'))
+                    .find(el => el.offsetParent !== null && el.offsetWidth > 100);
+                if (ce) return ce;
+                // Last resort: textarea
+                return document.querySelector('textarea');
+            """)
+        except Exception:
+            pass
+
         if not input_el:
             raise Exception("Gemini input box not found")
 
-        input_el.click()
+        _status(f"{tag}  input found — injecting prompt")
+
+        # ── Step 3: Inject prompt text ────────────────────────────────────
+        # Use JavaScript execCommand for reliable text insertion into contenteditable
+        driver.execute_script("arguments[0].focus();", input_el)
         time.sleep(0.3)
-        input_el.send_keys(prompt)
+
+        # Try execCommand first (most reliable for contenteditable)
+        injected = driver.execute_script("""
+            arguments[0].focus();
+            const success = document.execCommand('insertText', false, arguments[1]);
+            if (!success) {
+                // Fallback: dispatch input events manually
+                arguments[0].textContent = arguments[1];
+                arguments[0].dispatchEvent(new Event('input', {bubbles: true}));
+                arguments[0].dispatchEvent(new Event('change', {bubbles: true}));
+            }
+            return arguments[0].textContent.length;
+        """, input_el, prompt)
+        _status(f"{tag}  prompt injected ({injected} chars)")
         time.sleep(0.5)
 
-        # Snapshot existing images before send
+        # If execCommand failed (returned 0 length), try ActionChains
+        if not injected:
+            _status(f"{tag}  execCommand failed — using ActionChains")
+            ActionChains(driver).move_to_element(input_el).click().send_keys(prompt).perform()
+            time.sleep(0.5)
+
+        # ── Step 4: Snapshot existing images before sending ───────────────
         try:
             _existing_srcs = set(driver.execute_script("""
                 return Array.from(document.querySelectorAll('img'))
@@ -409,22 +462,27 @@ def process(jewel_path, tag_path, bg_path, category="earrings",
         except Exception:
             _existing_srcs = set()
 
-        # Send (Enter or send button)
-        sent = False
-        try:
-            send_btn = driver.execute_script("""
-                return Array.from(document.querySelectorAll('button')).find(b => {
-                    const l = (b.getAttribute('aria-label') || b.title || '').toLowerCase();
-                    return l.includes('send') || l.includes('submit');
-                });
-            """)
-            if send_btn:
-                send_btn.click()
-                sent = True
-        except Exception:
-            pass
+        # ── Step 5: Send the message ──────────────────────────────────────
+        sent = driver.execute_script("""
+            // Try send button by aria-label
+            const byLabel = Array.from(document.querySelectorAll('button')).find(b => {
+                const l = (b.getAttribute('aria-label') || b.title || '').toLowerCase();
+                return l.includes('send') || l.includes('submit') || l === 'send message';
+            });
+            if (byLabel && !byLabel.disabled) { byLabel.click(); return 'aria-label'; }
+
+            // Try send button by data-testid or mat-icon-button
+            const matSend = document.querySelector('button[data-mat-icon-name="send"], button.send-button, button[jsname]');
+            if (matSend && !matSend.disabled) { matSend.click(); return 'mat'; }
+
+            return null;
+        """)
+
         if not sent:
+            _status(f"{tag}  no send button found — pressing Enter")
             input_el.send_keys(Keys.RETURN)
+        else:
+            _status(f"{tag}  sent via {sent}")
 
         _chat_pair_count += 1
         time.sleep(1)

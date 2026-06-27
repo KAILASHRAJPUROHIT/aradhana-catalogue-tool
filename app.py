@@ -387,19 +387,47 @@ def _run_chatgpt_job(pairs, category, bg_name):
                 job_id=s.get("job_id") or f"{i+1:03d}",
             )
 
-            # Rate limit or token exhaustion — pause and retry same pair
+            # Rate limit → try Gemini as instant fallback instead of waiting
             err = (result.get("error") or "")
             if "RATE_LIMIT" in err or any(p in err.lower() for p in ["too many", "rate limit", "slow down"]):
                 rate_limit_hits += 1
-                CGPT_JOB["current"] = f"⏳ Rate limited (hit #{rate_limit_hits}) — slot scheduler waiting"
-                # Use slot scheduler — sleeps exactly until oldest slot's 3hr window expires
+                CGPT_JOB["current"] = f"⏳ ChatGPT rate limited — switching to Gemini for pair {s['pair']}"
+                try:
+                    gem_result = gemini_bg.process(
+                        jewel_path=jewel, tag_path=tag or jewel, bg_path=bg_path,
+                        category=category,
+                        pair_num=f"{i+1}/{len(pairs)} [Gemini fallback]",
+                        job_id=s.get("job_id") or f"{i+1:03d}",
+                    )
+                    if gem_result.get("output") and os.path.exists(gem_result["output"]):
+                        CGPT_JOB["current"] = f"✅ Pair {s['pair']} done via Gemini fallback"
+                        result = gem_result
+                        result["engine"] = "gemini_fallback"
+                        break   # success via fallback — skip further ChatGPT retries
+                    CGPT_JOB["current"] = f"⚠ Gemini fallback failed too — waiting for ChatGPT slot"
+                except Exception as ge:
+                    CGPT_JOB["current"] = f"⚠ Gemini fallback error: {ge} — waiting for ChatGPT slot"
+                # Gemini also failed — wait for ChatGPT slot using slot scheduler
                 chatgpt_bg.slot_wait_if_needed(
                     status_fn=lambda m: CGPT_JOB.update({"current": m})
                 )
                 continue
             if any(p in err.lower() for p in ["token", "quota", "usage", "exhausted"]):
                 token_exhausted = True
-                CGPT_JOB["current"] = f"⛔ Pair {s['pair']} — token limit hit"
+                CGPT_JOB["current"] = f"⛔ Pair {s['pair']} — token limit hit, trying Gemini"
+                try:
+                    gem_result = gemini_bg.process(
+                        jewel_path=jewel, tag_path=tag or jewel, bg_path=bg_path,
+                        category=category,
+                        pair_num=f"{i+1}/{len(pairs)} [Gemini fallback]",
+                        job_id=s.get("job_id") or f"{i+1:03d}",
+                    )
+                    if gem_result.get("output") and os.path.exists(gem_result["output"]):
+                        result = gem_result
+                        result["engine"] = "gemini_fallback"
+                        break
+                except Exception:
+                    pass
                 continue
 
             if result.get("output") and os.path.exists(result["output"]):

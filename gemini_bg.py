@@ -589,42 +589,76 @@ def process(jewel_path, tag_path, bg_path, category="earrings",
 
     label = None
 
-    def _quick_scan_for_image(timeout=15):
+    def _scan_shadow_imgs():
         """
-        Fast-path scan: Gemini often completes in 3-8 seconds.
-        Polls every second for a new image before falling back to stop-button watch.
+        Find new generated image piercing ALL shadow DOM — 1 per second poll.
+        Returns img src string or None.
         """
-        for t in range(timeout):
-            time.sleep(1)
-            try:
-                driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                all_imgs = driver.find_elements(By.TAG_NAME, "img")
-                for el in all_imgs:
-                    try:
-                        s = el.get_attribute("src") or el.get_attribute("currentSrc") or ""
-                        if not s or s in _existing_srcs:
-                            continue
-                        sz = el.size
-                        w, h = sz.get("width", 0), sz.get("height", 0)
-                        if w > 100 and h > 100:
-                            _status(f"{tag}⚡ Fast image found at {t}s: {s[:80]}")
-                            return s
-                    except Exception:
-                        pass
-            except Exception:
-                pass
-        return None
+        try:
+            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            infos = driver.execute_script(_SHADOW_FIND_IMGS) or []
+            best_src, best_area = None, 0
+            for info in infos:
+                s = info.get("src", "")
+                w = info.get("w", 0)
+                h = info.get("h", 0)
+                if not s or s in _existing_srcs:
+                    continue
+                if "svg" in s or "favicon" in s or "avatar" in s:
+                    continue
+                if w < 100 or h < 100:
+                    continue
+                area = w * h
+                if area > best_area:
+                    best_area = area
+                    best_src = s
+            return best_src
+        except Exception:
+            return None
 
-    # Fast path — check if Gemini already finished (it's often done in <10s)
-    fast_result = _quick_scan_for_image(timeout=12)
-    if fast_result:
-        img_src = fast_result
-    else:
-        # Full stop-button watch for slower responses
-        gen_status = _wait_for_generation(driver, time.time() + 420, tag)
-        if gen_status == "deadline":
-            return {"label": label, "output": None, "error": "Gemini timed out"}
-        img_src = None   # will be set in scan loop below
+    # ── Per-second polling — runs throughout generation ───────────────────────
+    # Gemini can finish in 3-8 seconds. Poll every second from the moment
+    # the prompt is sent so we never miss a fast response.
+    # Simultaneously watch for the stop button for slow responses.
+    _status(f"{tag}⏳ Watching Gemini every second…")
+    img_src  = None
+    deadline = time.time() + 420
+
+    # Phase 1: Fast poll first 20 seconds (catches Gemini's typical speed)
+    for t in range(20):
+        time.sleep(1)
+        found = _scan_shadow_imgs()
+        if found:
+            _status(f"{tag}⚡ Image found at {t+1}s: {found[:80]}")
+            img_src = found
+            break
+        # Also check if stop button appeared + disappeared (slower model)
+        vis = _safe_js(driver, _STOP_JS)
+        if t == 0 and vis:
+            _status(f"{tag}⬛ Generating…")
+
+    # Phase 2: If not found yet, keep polling while watching stop button
+    if not img_src:
+        _status(f"{tag}⏳ Still waiting — polling every second")
+        gen_done = False
+        while time.time() < deadline and not img_src:
+            time.sleep(1)
+            found = _scan_shadow_imgs()
+            if found:
+                _status(f"{tag}🖼️ Image found: {found[:80]}")
+                img_src = found
+                break
+            vis = _safe_js(driver, _STOP_JS)
+            if gen_done and not vis:
+                # Stop disappeared — wait 2 more seconds then scan one more time
+                time.sleep(2)
+                img_src = _scan_shadow_imgs()
+                break
+            if vis:
+                gen_done = True
+
+    if not img_src:
+        return {"label": label, "output": None, "error": "Gemini: image not found after polling"}
 
     # Check for error response
     time.sleep(2)

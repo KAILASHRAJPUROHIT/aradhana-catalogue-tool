@@ -875,11 +875,30 @@ def make_unique(src):
 
 
 def dismiss_dialogs(driver):
-    driver.execute_script("""
-        document.querySelectorAll('button').forEach(b => {
-            if (['OK','Ok','Got it','Dismiss'].includes(b.textContent.trim())) b.click();
-        });
-    """)
+    """Close any modal/dialog that might be blocking the page."""
+    try:
+        driver.execute_script("""
+            // 1. Press Escape to close any open modal
+            document.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true}));
+
+            // 2. Click standard dismiss buttons
+            document.querySelectorAll('button').forEach(b => {
+                const t = b.textContent.trim();
+                if (['OK','Ok','Got it','Dismiss','Close','Cancel','No thanks'].includes(t))
+                    b.click();
+            });
+
+            // 3. Close any open [role="dialog"] via its close button
+            const dialog = document.querySelector('[role="dialog"]');
+            if (dialog) {
+                const close = dialog.querySelector(
+                    'button[aria-label*="close" i], button[aria-label*="dismiss" i], ' +
+                    'button[data-testid*="close"], button:first-child');
+                if (close) close.click();
+            }
+        """)
+    except Exception:
+        pass
 
 
 def download_image(driver, img_el, save_path):

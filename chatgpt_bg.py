@@ -1231,7 +1231,7 @@ def process(jewel_path, tag_path, bg_path, is_first=False, category="jewellery",
                 return msgs.length ? msgs[msgs.length-1].innerText : '';
             """) or ""
             # Tight pattern: label code has no spaces — letters/digits/slash/dash only
-            m = re.search(r"LABEL[:\s]+([A-Z0-9][A-Z0-9/_-]{1,18})", msg_text, re.I)
+            m = re.search(r"LABEL[:\s]+([A-Z][A-Z0-9/_-]{1,18})", msg_text)
             if m:
                 candidate = m.group(1).strip().rstrip(".")
                 # Reject if it looks like prose

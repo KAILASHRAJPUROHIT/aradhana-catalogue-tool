@@ -463,9 +463,17 @@ def _upload_with_verify(driver, wait, files, tag=""):
         _copy_image_to_clipboard(img_path)
         time.sleep(0.3)
         ActionChains(driver).key_down(Keys.CONTROL).send_keys('v').key_up(Keys.CONTROL).perform()
-        time.sleep(1.0)   # wait for ChatGPT to render the thumbnail
+        time.sleep(0.5)
+        # Fire input event so ChatGPT registers the pasted image in Quill state
+        try:
+            driver.execute_script(
+                "arguments[0].dispatchEvent(new Event('input',{bubbles:true}));",
+                input_el)
+        except Exception:
+            pass
+        time.sleep(0.8)   # wait for thumbnail to render
 
-        # Dismiss any popup that appears (duplicate image warning etc.)
+        # Dismiss any popup (duplicate image warning etc.)
         driver.execute_script("""
             document.querySelectorAll('button').forEach(b => {
                 const t = (b.textContent || '').trim();

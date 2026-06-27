@@ -648,7 +648,11 @@ function showResults(results, done, total) {
         : '';
       d.innerHTML = `<img src="/img/output/${r.output}" onerror="this.style.display='none'">
                      <div class="sku">${r.sku || '—'}</div>
-                     <div class="ok">✓ saved</div>${engineBadge}`;
+                     <div class="ok">✓ saved</div>${engineBadge}
+                     <button onclick="rejectResult(${r.pair},'${r.sku||''}')"
+                       style="margin-top:4px;width:100%;padding:3px;background:none;
+                              border:1px solid #da3633;color:#da3633;border-radius:4px;
+                              font-size:10px;cursor:pointer">✗ Reject &amp; Reprocess</button>`;
     } else if (r.skipped) {
       d.style.opacity = '0.5';
       d.innerHTML = `<div class="sku">${r.sku || '—'}</div>

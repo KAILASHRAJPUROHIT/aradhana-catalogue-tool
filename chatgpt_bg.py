@@ -94,7 +94,9 @@ def slot_wait_if_needed(status_fn=None):
         slept += chunk
         remaining = max(0, wait - slept)
         if remaining > 0:
-            _st(f"⏳ Slot cooldown — {int(remaining)}s remaining (unlocks {unlock_str})")
+            mins = int(remaining) // 60
+            secs = int(remaining) % 60
+            _st(f"⏳ Rate limit cooldown — {mins}m {secs}s remaining (unlocks {unlock_str}) — tool will resume automatically")
 
     # Prune expired slots
     _slots_save([t for t in _slots_load() if time.time() - t < _WINDOW])

@@ -159,13 +159,20 @@ def api_stage():
 
     return jsonify({"staged": staged})
 
-# ── Step 5 — ChatGPT processing ───────────────────────────────────────────────
+# ── Step 5 — ChatGPT + Gemini processing ──────────────────────────────────────
+
+import gemini_bg
 
 CGPT_JOB = {
     "running": False, "total": 0, "done": 0,
     "current": "", "started": 0.0, "results": [], "error": None,
 }
-chatgpt_bg._JOB_DICT = CGPT_JOB   # wire status updates into live progress bar
+GEMINI_JOB = {
+    "running": False, "total": 0, "done": 0,
+    "current": "idle", "started": 0.0, "results": [], "error": None,
+}
+chatgpt_bg._JOB_DICT = CGPT_JOB
+gemini_bg._JOB_DICT  = GEMINI_JOB
 
 def _bg_for(category):
     path = os.path.join(BACKGROUNDS_DIR, f"{category}.png")

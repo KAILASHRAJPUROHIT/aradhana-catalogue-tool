@@ -374,7 +374,35 @@ def process(jewel_path, tag_path, bg_path, category="earrings",
     if not _ensure_logged_in(driver):
         return {"label": None, "output": None, "error": "Gemini: not logged in"}
 
-    # ── 2. Wait for input to be ready ────────────────────────────────────────
+    # ── 2. Switch to 2.0 Flash (faster + better than Flash-Lite) ─────────────
+    try:
+        switched = driver.execute_script("""
+            // Click the model picker button
+            const picker = document.querySelector('button[aria-label*="mode picker"], button[aria-label*="Flash"]');
+            if (!picker) return 'no-picker';
+            picker.click();
+            return 'opened';
+        """)
+        if switched == 'opened':
+            time.sleep(0.8)
+            driver.execute_script("""
+                // Find and click "2.0 Flash" option in the dropdown
+                const items = Array.from(document.querySelectorAll(
+                    '[role=option],[role=menuitem],[role=listitem],button,mat-option'));
+                const flash2 = items.find(el => {
+                    const t = el.textContent.trim();
+                    return t.includes('2.0 Flash') || t.includes('Gemini 2.0 Flash');
+                });
+                if (flash2) { flash2.click(); return 'switched'; }
+                // Close picker if model not found
+                document.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true}));
+                return 'not-found';
+            """)
+            time.sleep(0.5)
+    except Exception:
+        pass
+
+    # ── 3. Wait for input to be ready ────────────────────────────────────────
     input_el = None
     for _ in range(10):
         input_el = driver.execute_script("""

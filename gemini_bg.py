@@ -214,10 +214,21 @@ def _delete_chat_ui(driver):
 # ── Stop button detection (Gemini uses different aria-labels) ─────────────────
 
 _STOP_JS = """
-    return Array.from(document.querySelectorAll('button')).some(b => {
-        const l = (b.getAttribute('aria-label') || b.textContent || '').toLowerCase();
-        return l.includes('stop') || l.includes('cancel') || l.includes('generating');
+    // Gemini shows a square stop icon button while generating
+    // Check buttons, also check for loading spinner / progress indicators
+    const stopBtn = Array.from(document.querySelectorAll('button')).some(b => {
+        const l = (b.getAttribute('aria-label') || b.getAttribute('data-tooltip') ||
+                   b.textContent || '').toLowerCase().trim();
+        return l === 'stop' || l === 'stop generating' || l.includes('stop response') ||
+               l.includes('cancel') || l === 'stop generation';
     });
+    if (stopBtn) return true;
+    // Also check for loading indicators (spinner, progress)
+    const loading = document.querySelector(
+        '.loading-indicator, [class*="loading"], [class*="spinner"], ' +
+        'mat-progress-spinner, [class*="generating"], [aria-label*="loading"]'
+    );
+    return !!loading;
 """
 
 def _wait_for_generation(driver, deadline, tag="[G]"):

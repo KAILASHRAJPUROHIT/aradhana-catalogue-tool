@@ -91,46 +91,42 @@ def connect():
             time.sleep(3)
     raise RuntimeError("Gemini Chrome unreachable")
 
-def _find_chrome_hwnds2():
-    try:
-        import ctypes, ctypes.wintypes
-        u32 = ctypes.windll.user32
-        found = []
-        def _cb(h, _):
-            if not u32.IsWindowVisible(h): return True
-            buf = ctypes.create_unicode_buffer(256)
-            u32.GetWindowTextW(h, buf, 256)
-            if "chrome" in buf.value.lower() or "gemini" in buf.value.lower():
-                found.append(h)
-            return True
-        u32.EnumWindows(ctypes.WINFUNCTYPE(ctypes.c_bool,
-            ctypes.wintypes.HWND, ctypes.wintypes.LPARAM)(_cb), 0)
-        return found
-    except Exception:
+_GEMINI_CHROME_PID = None
+
+
+def _find_gemini_hwnds():
+    if not _GEMINI_CHROME_PID:
         return []
+    import ctypes, ctypes.wintypes
+    u32 = ctypes.windll.user32
+    found = []
+    def _cb(h, _):
+        pid = ctypes.wintypes.DWORD(0)
+        u32.GetWindowThreadProcessId(h, ctypes.byref(pid))
+        if pid.value == _GEMINI_CHROME_PID and u32.IsWindowVisible(h):
+            found.append(h)
+        return True
+    u32.EnumWindows(ctypes.WINFUNCTYPE(ctypes.c_bool,
+        ctypes.wintypes.HWND, ctypes.wintypes.LPARAM)(_cb), 0)
+    return found
 
 def _chrome_to_background():
-    """Completely hide Chrome — invisible, off taskbar, off Alt+Tab."""
+    """Push ONLY our Gemini Chrome behind other windows."""
     try:
         import ctypes
         u32 = ctypes.windll.user32
-        for h in _find_chrome_hwnds2():
-            style = u32.GetWindowLongW(h, -20)
-            style = (style | 0x00000080) & ~0x00040000
-            u32.SetWindowLongW(h, -20, style)
-            u32.ShowWindow(h, 0)
+        HWND_BOTTOM = ctypes.wintypes.HWND(1)
+        for h in _find_gemini_hwnds():
+            u32.SetWindowPos(h, HWND_BOTTOM, 0, 0, 0, 0, 0x0002|0x0001|0x0010)
     except Exception:
         pass
 
 def _chrome_to_foreground():
-    """Reveal Chrome for login only."""
+    """Reveal ONLY our Gemini Chrome for login."""
     try:
         import ctypes
         u32 = ctypes.windll.user32
-        for h in _find_chrome_hwnds2():
-            style = u32.GetWindowLongW(h, -20)
-            style = (style | 0x00040000) & ~0x00000080
-            u32.SetWindowLongW(h, -20, style)
+        for h in _find_gemini_hwnds():
             u32.ShowWindow(h, 9)
             u32.SetForegroundWindow(h)
     except Exception:

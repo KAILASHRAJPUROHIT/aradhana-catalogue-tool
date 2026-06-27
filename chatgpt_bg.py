@@ -232,25 +232,27 @@ def craft_prompt_gemma(jewel_path: str, category: str, job_id: str = "") -> str:
 PROMPT = build_prompt("jewellery", "INIT")
 
 
-# PID of the catalogue Chrome we launched — only touch THIS process's windows
-_CATALOGUE_CHROME_PID = None
+_CATALOGUE_CHROME_PID = None   # kept for reference, not used for window finding
 
 
 def _find_catalogue_hwnds():
     """
-    Return window handles belonging ONLY to our catalogue Chrome process (by PID).
-    Never touches the user's personal Chrome.
+    Find catalogue Chrome windows by page title — much more reliable than PID
+    since Chrome windows are owned by child processes, not the parent.
+    Targets only ChatGPT/chatgpt.com windows — never the user's personal Chrome.
     """
-    if not _CATALOGUE_CHROME_PID:
-        return []
     import ctypes, ctypes.wintypes
     u32   = ctypes.windll.user32
     found = []
 
     def _cb(hwnd, _):
-        pid = ctypes.wintypes.DWORD(0)
-        u32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
-        if pid.value == _CATALOGUE_CHROME_PID and u32.IsWindowVisible(hwnd):
+        if not u32.IsWindowVisible(hwnd):
+            return True
+        buf = ctypes.create_unicode_buffer(512)
+        u32.GetWindowTextW(hwnd, buf, 512)
+        t = buf.value.lower()
+        # Only match windows that are on the ChatGPT domain
+        if "chatgpt" in t or "chatgpt.com" in t:
             found.append(hwnd)
         return True
 
@@ -260,12 +262,12 @@ def _find_catalogue_hwnds():
 
 
 def _chrome_to_background():
-    """Push ONLY our catalogue Chrome behind all other windows. Never touches user's Chrome."""
+    """Push our ChatGPT Chrome behind all other windows. User's personal Chrome is untouched."""
     try:
         import ctypes
         u32         = ctypes.windll.user32
         HWND_BOTTOM = ctypes.wintypes.HWND(1)
-        SWP_FLAGS   = 0x0002 | 0x0001 | 0x0010  # NOMOVE | NOSIZE | NOACTIVATE
+        SWP_FLAGS   = 0x0002 | 0x0001 | 0x0010   # NOMOVE | NOSIZE | NOACTIVATE
         for hwnd in _find_catalogue_hwnds():
             u32.SetWindowPos(hwnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_FLAGS)
     except Exception:
@@ -273,12 +275,12 @@ def _chrome_to_background():
 
 
 def _chrome_to_foreground():
-    """Bring ONLY our catalogue Chrome forward — for login prompts only."""
+    """Bring ChatGPT Chrome to front — login prompts only."""
     try:
         import ctypes
         u32 = ctypes.windll.user32
         for hwnd in _find_catalogue_hwnds():
-            u32.ShowWindow(hwnd, 9)        # SW_RESTORE
+            u32.ShowWindow(hwnd, 9)
             u32.SetForegroundWindow(hwnd)
     except Exception:
         pass

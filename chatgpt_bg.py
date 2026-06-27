@@ -1057,14 +1057,7 @@ def process(jewel_path, tag_path, bg_path, is_first=False, category="jewellery",
 
     _upload_with_verify(driver, wait, files, tag)
     time.sleep(0.5)
-
-    # If no thumbnails appeared, retry once
-    if _count_input_imgs() == 0:
-        _status(f"{tag}⚠️ No thumbnails after upload — retrying paste")
-        _upload_with_verify(driver, wait, files, tag)
-        time.sleep(0.5)
-        n = _count_input_imgs()
-        _status(f"{tag}  {n} thumbnail(s) in input after retry")
+    _status(f"{tag}  {_count_input_imgs()} thumbnail(s) in input")
 
     dismiss_dialogs(driver)
     time.sleep(0.3)

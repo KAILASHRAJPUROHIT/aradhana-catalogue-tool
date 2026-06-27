@@ -111,22 +111,22 @@ def _find_gemini_hwnds():
     return found
 
 def _chrome_to_background():
-    """Push our Gemini Chrome behind other windows."""
+    """Move Gemini Chrome back off-screen."""
     try:
         import ctypes
         u32 = ctypes.windll.user32
-        HWND_BOTTOM = ctypes.wintypes.HWND(1)
         for h in _find_gemini_hwnds():
-            u32.SetWindowPos(h, HWND_BOTTOM, 0, 0, 0, 0, 0x0002|0x0001|0x0010)
+            u32.SetWindowPos(h, 0, -32000, -32000, 1280, 900, 0x0010)
     except Exception:
         pass
 
 def _chrome_to_foreground():
-    """Reveal our Gemini Chrome for login only."""
+    """Move Gemini Chrome on-screen for login only."""
     try:
         import ctypes
         u32 = ctypes.windll.user32
         for h in _find_gemini_hwnds():
+            u32.SetWindowPos(h, 0, 100, 100, 1280, 900, 0x0010)
             u32.ShowWindow(h, 9)
             u32.SetForegroundWindow(h)
     except Exception:

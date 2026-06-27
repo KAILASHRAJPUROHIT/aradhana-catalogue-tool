@@ -517,14 +517,38 @@ def process(jewel_path, tag_path, bg_path, category="earrings",
 
     _chrome_to_background()
 
-    # ── 7. Per-second polling for generated image ─────────────────────────────
-    # Gemini typically finishes in 3-15 seconds.
-    # We poll every second looking for a NEW large image that wasn't in pre_srcs.
+    # ── 7. Wait for generation then detect output image ──────────────────────
+    # Phase 1: Wait for stop button to APPEAR — confirms Gemini received message
+    # and started generating. Re-snapshot all images at this point (chat
+    # re-creates blob URLs for sent thumbnails = they're new vs pre_srcs).
     label   = None
     img_src = None
-    start   = time.time()
 
-    for tick in range(120):  # up to 2 minutes
+    _status(f"{tag}⏳ Waiting for Gemini to start generating…")
+    stable_srcs = set(pre_srcs)   # will expand once generation starts
+
+    for t in range(30):
+        time.sleep(1)
+        stop = _safe_js(driver, """
+            return !!document.querySelector('button[aria-label*="Stop"]');
+        """)
+        if stop:
+            _status(f"{tag}⬛ Gemini generating — re-snapshotting chat thumbnails")
+            # Re-snapshot NOW to include the sent-message's re-created blob URLs
+            try:
+                new_srcs = driver.execute_script(
+                    "return Array.from(document.querySelectorAll('img'))"
+                    ".map(i=>i.src||'').filter(s=>s);") or []
+                stable_srcs = set(new_srcs)
+            except Exception:
+                pass
+            break
+        if t == 29:
+            _status(f"{tag}⚠ Stop button never appeared — scanning anyway")
+
+    # Phase 2: Poll every second until a NEW large image appears
+    _status(f"{tag}⏳ Watching for generated image…")
+    for tick in range(120):
         time.sleep(1)
         try:
             driver.execute_script("window.scrollTo(0,document.body.scrollHeight);")
@@ -533,30 +557,27 @@ def process(jewel_path, tag_path, bg_path, category="earrings",
             for el in all_imgs:
                 try:
                     s = el.get_attribute("src") or ""
-                    if not s or s in pre_srcs:
+                    if not s or s in stable_srcs:
                         continue
                     if "svg" in s or "gstatic" in s or "googleusercontent.com/a/" in s:
-                        continue  # skip UI icons and avatars
-
-                    # KEY FIX: Gemini renders generated images at 112px but
-                    # naturalWidth is 1024px. Use naturalWidth NOT offsetWidth.
+                        continue
+                    # Use naturalWidth — Gemini renders output at 112px but
+                    # naturalWidth is the actual 1024px resolution
                     nat_w = el.get_property("naturalWidth") or 0
                     nat_h = el.get_property("naturalHeight") or 0
-                    area  = nat_w * nat_h
-
                     if nat_w < 400 or nat_h < 400:
-                        continue   # skip thumbnails/icons
-                    if area > best_area:
-                        best_area = area
+                        continue
+                    if nat_w * nat_h > best_area:
+                        best_area = nat_w * nat_h
                         best_src  = s
                 except Exception:
                     pass
             if best_src:
                 img_src = best_src
-                _status(f"{tag}⚡ Image found at {tick+1}s nat={int(best_area**0.5)}px: {best_src[:80]}")
+                _status(f"{tag}⚡ Generated image at tick {tick+1}: {best_src[:80]}")
                 break
             if tick % 10 == 9:
-                _status(f"{tag}⏳ Still generating… {tick+1}s")
+                _status(f"{tag}⏳ Still waiting… {tick+1}s")
         except Exception as e:
             _status(f"{tag}  tick {tick}: {e}")
 

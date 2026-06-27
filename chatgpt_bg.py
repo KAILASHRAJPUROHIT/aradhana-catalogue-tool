@@ -432,46 +432,67 @@ def _copy_image_to_clipboard(img_path):
 
 def _upload_with_verify(driver, wait, files, tag=""):
     """
-    Paste images into ChatGPT via clipboard (Ctrl+V) — one at a time.
-    Uses _wait_for_input_ready so we never start before the input is live.
+    Upload images to ChatGPT via the + button → file input.
+    This is Selenium's most reliable upload method — bypasses OS dialog,
+    no clipboard dependency, works regardless of focus.
     """
     files = files[:3]
 
-    # Use the same ready-check used for prompt typing — confirmed selector div#prompt-textarea
+    # Click the + (Add files) button to reveal the file input
     try:
-        input_el = _wait_for_input_ready(driver, wait, tag)
-    except TimeoutError:
-        input_el = None
-
-    if not input_el:
-        _status(f"{tag}⚠ Input not found after 15s — skipping image upload")
+        plus = wait.until(EC.element_to_be_clickable(
+            (By.CSS_SELECTOR, 'button[data-testid="composer-plus-btn"]')))
+        plus.click()
+        time.sleep(0.8)
+    except Exception as e:
+        _status(f"{tag}⚠ + button not found: {e}")
         return
 
-    input_el.click()
-    time.sleep(0.3)
-
-    for idx, img_path in enumerate(files, 1):
-        _copy_image_to_clipboard(img_path)
-        time.sleep(0.3)
-        ActionChains(driver).key_down(Keys.CONTROL).send_keys('v').key_up(Keys.CONTROL).perform()
-        time.sleep(0.5)
-        # Fire input event so ChatGPT registers the pasted image in Quill state
+    # After clicking +, find the file input (it appears in the DOM)
+    file_input = None
+    for _ in range(10):
         try:
-            driver.execute_script(
-                "arguments[0].dispatchEvent(new Event('input',{bubbles:true}));",
-                input_el)
+            inputs = driver.find_elements(By.CSS_SELECTOR, 'input[type="file"]')
+            if inputs:
+                file_input = inputs[0]
+                break
         except Exception:
             pass
-        time.sleep(0.8)   # wait for thumbnail to render
+        time.sleep(0.5)
 
-        # Dismiss any popup (duplicate image warning etc.)
-        driver.execute_script("""
-            document.querySelectorAll('button').forEach(b => {
-                const t = (b.textContent || '').trim();
-                if (['OK','Ok','Got it','Dismiss','Yes','Continue'].includes(t)) b.click();
-            });
-        """)
-        _status(f"{tag}📋 Image {idx}/3 pasted")
+    if not file_input:
+        # Try clicking "Upload files" menu option first
+        try:
+            driver.execute_script("""
+                const items = Array.from(document.querySelectorAll(
+                    '[role="menuitem"], [data-testid*="upload"], button'));
+                const upload = items.find(el => {
+                    const t = (el.textContent || el.getAttribute('aria-label') || '').toLowerCase();
+                    return t.includes('upload') || t.includes('computer') || t.includes('file');
+                });
+                if (upload) upload.click();
+            """)
+            time.sleep(0.8)
+            inputs = driver.find_elements(By.CSS_SELECTOR, 'input[type="file"]')
+            if inputs:
+                file_input = inputs[0]
+        except Exception as e:
+            _status(f"{tag}⚠ Could not find file input: {e}")
+            return
+
+    if not file_input:
+        _status(f"{tag}⚠ File input never appeared")
+        return
+
+    # Send all 3 file paths at once — Selenium handles this natively
+    abs_paths = "\n".join(os.path.abspath(f) for f in files)
+    try:
+        driver.execute_script("arguments[0].style.display='block';", file_input)
+        file_input.send_keys(abs_paths)
+        _status(f"{tag}📎 3 files sent to input")
+        time.sleep(2)   # let ChatGPT process and show thumbnails
+    except Exception as e:
+        _status(f"{tag}⚠ send_keys failed: {e}")
 
 
 def _detect_rate_limit(driver) -> bool:

@@ -725,12 +725,56 @@ def api_chatgpt_progress():
     eta     = None
     if j["running"] and done > 0 and total > done:
         eta = int((elapsed / done) * (total - done))
+    # Merge Gemini results in when running parallel
+    all_results = list(j["results"] or [])
+    if GEMINI_JOB["running"] or GEMINI_JOB.get("results"):
+        all_results = sorted(
+            all_results + list(GEMINI_JOB.get("results") or []),
+            key=lambda r: r.get("pair", 0)
+        )
+        done  = len([r for r in all_results if r.get("output") or r.get("error")])
+        total = CGPT_JOB["total"] + GEMINI_JOB["total"]
     return jsonify({
-        "running": j["running"], "done": done, "total": total,
-        "current": j["current"], "elapsed": elapsed, "eta": eta,
-        "results": j["results"], "error": j["error"],
+        "running": j["running"] or GEMINI_JOB["running"],
+        "done": done, "total": total,
+        "current": j["current"],
+        "gemini_current": GEMINI_JOB.get("current", ""),
+        "elapsed": elapsed, "eta": eta,
+        "results": all_results, "error": j["error"],
         "slots": chatgpt_bg.slot_status(),
     })
+
+
+@app.route("/api/gemini_run", methods=["POST"])
+def api_gemini_run():
+    if GEMINI_JOB["running"]:
+        return jsonify({"error": "Gemini already running"}), 400
+    data     = request.json or {}
+    category = data.get("category", "earrings")
+    bg_name  = data.get("bg", "")
+    pairs    = _derive_pairs_from_disk()
+    GEMINI_JOB.update({"running": True, "total": len(pairs), "done": 0,
+                       "results": [], "started": time.time(), "error": None})
+    threading.Thread(target=_run_gemini_job,
+                     args=(pairs, category, bg_name), daemon=True).start()
+    return jsonify({"started": True, "pairs": len(pairs)})
+
+
+@app.route("/api/parallel_run", methods=["POST"])
+def api_parallel_run():
+    if CGPT_JOB["running"] or GEMINI_JOB["running"]:
+        return jsonify({"error": "Already running"}), 400
+    data     = request.json or {}
+    category = data.get("category", "earrings")
+    bg_name  = data.get("bg", "")
+    pairs    = _derive_pairs_from_disk()
+    CGPT_JOB.update({"running": True, "total": 0, "done": 0,
+                     "results": [], "started": time.time(), "error": None})
+    GEMINI_JOB.update({"running": True, "total": 0, "done": 0,
+                       "results": [], "started": time.time(), "error": None})
+    threading.Thread(target=_run_parallel_job,
+                     args=(pairs, category, bg_name), daemon=True).start()
+    return jsonify({"started": True, "pairs": len(pairs)})
 
 
 # ── launch ────────────────────────────────────────────────────────────────────

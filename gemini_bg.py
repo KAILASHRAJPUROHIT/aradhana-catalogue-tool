@@ -535,20 +535,25 @@ def process(jewel_path, tag_path, bg_path, category="earrings",
                     s = el.get_attribute("src") or ""
                     if not s or s in pre_srcs:
                         continue
-                    if "svg" in s or "favicon" in s or "avatar" in s or "thumbnail" in s:
-                        continue
-                    sz = el.size
-                    w, h = sz.get("width", 0), sz.get("height", 0)
-                    if w < 150 or h < 150:
-                        continue
-                    if w * h > best_area:
-                        best_area = w * h
+                    if "svg" in s or "gstatic" in s or "googleusercontent.com/a/" in s:
+                        continue  # skip UI icons and avatars
+
+                    # KEY FIX: Gemini renders generated images at 112px but
+                    # naturalWidth is 1024px. Use naturalWidth NOT offsetWidth.
+                    nat_w = el.get_property("naturalWidth") or 0
+                    nat_h = el.get_property("naturalHeight") or 0
+                    area  = nat_w * nat_h
+
+                    if nat_w < 400 or nat_h < 400:
+                        continue   # skip thumbnails/icons
+                    if area > best_area:
+                        best_area = area
                         best_src  = s
                 except Exception:
                     pass
             if best_src:
                 img_src = best_src
-                _status(f"{tag}⚡ Image found at {tick+1}s ({int(best_area**0.5)}px): {best_src[:80]}")
+                _status(f"{tag}⚡ Image found at {tick+1}s nat={int(best_area**0.5)}px: {best_src[:80]}")
                 break
             if tick % 10 == 9:
                 _status(f"{tag}⏳ Still generating… {tick+1}s")

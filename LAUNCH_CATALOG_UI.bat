@@ -20,11 +20,12 @@ echo Setting up catalogue virtual desktop...
 REM ── ChatGPT Chrome (port 9222) — opens directly on chatgpt.com ──────────────
 netstat -ano | findstr ":9222" | findstr LISTENING >nul 2>&1
 if errorlevel 1 (
-    echo Starting ChatGPT Chrome...
+    echo Starting ChatGPT Chrome (off-screen)...
     start "" "C:\Program Files\Google\Chrome\Application\chrome.exe" ^
         --remote-debugging-port=9222 ^
         --user-data-dir="C:\Users\kaila\AppData\Local\AutoCatalogueChrome" ^
         --no-first-run --no-default-browser-check ^
+        --window-position=-32000,-32000 --window-size=1280,900 ^
         --homepage=https://chatgpt.com ^
         https://chatgpt.com
     timeout /t 4 >nul

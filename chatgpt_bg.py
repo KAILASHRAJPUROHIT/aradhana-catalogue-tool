@@ -1452,7 +1452,9 @@ def process(jewel_path, tag_path, bg_path, is_first=False, category="jewellery",
             # Skip patterns: extension logos, CDN icons, known non-content URLs
             _SKIP = ("chrome-extension://", "extension://", "canva.com", "canva.cn",
                      "svg", "favicon", "avatar", "logo", "icon", "emoji",
-                     "google.com/favicon", "gstatic.com/images")
+                     "google.com/favicon", "gstatic.com/images",
+                     # estuary/content = uploaded input files, never the generated output
+                     "estuary/content", "backend-api/files", "file_0000")
 
             new_imgs = []
             for el in all_imgs:
@@ -1466,7 +1468,7 @@ def process(jewel_path, tag_path, bg_path, is_first=False, category="jewellery",
                 except Exception:
                     pass
 
-            # Priority 1: oaiusercontent CDN — ChatGPT generated images always served from here
+            # Priority 1: oaiusercontent CDN — ChatGPT generated images served from here
             for s, el in new_imgs:
                 if "oaiusercontent" in s or "files.openai" in s:
                     img_src = s
@@ -1475,7 +1477,7 @@ def process(jewel_path, tag_path, bg_path, is_first=False, category="jewellery",
             if img_src:
                 break
 
-            # Priority 2: largest new image with reasonable aspect ratio (not a circle logo)
+            # Priority 2: largest new image, reasonable ratio, NOT an upload thumbnail
             best_src, best_area = None, 0
             for s, el in new_imgs:
                 try:
@@ -1485,7 +1487,7 @@ def process(jewel_path, tag_path, bg_path, is_first=False, category="jewellery",
                         continue
                     ratio = w / (h or 1)
                     if ratio < 0.5 or ratio > 2.0:
-                        continue   # skip very tall/wide banners and circular icons
+                        continue
                     if w * h > best_area:
                         best_area = w * h
                         best_src = s

@@ -330,8 +330,12 @@ def _run_chatgpt_job(pairs, category, bg_name):
     CGPT_JOB["current"] = f"📂 {len(pairs)} pairs found on disk (sorted by file number)"
 
     # Resolve background
-    if bg_name and not bg_name.endswith(".png"):
-        bg_name += ".png"
+    if bg_name and not bg_name.lower().endswith((".png",".jpg",".jpeg",".webp")):
+        # Try to find matching file with any image extension
+        for ext in (".png",".jpg",".jpeg",".webp"):
+            if os.path.exists(os.path.join(BACKGROUNDS_DIR, bg_name + ext)):
+                bg_name += ext
+                break
     bg_path = os.path.join(BACKGROUNDS_DIR, bg_name) if bg_name else None
     if not bg_path or not os.path.exists(bg_path):
         bg_path = os.path.join(BACKGROUNDS_DIR, f"{category}.png")
@@ -544,8 +548,12 @@ def _run_chatgpt_job(pairs, category, bg_name):
 
 def _run_gemini_job(pairs, category, bg_name):
     """Mirror of _run_chatgpt_job but using gemini_bg."""
-    if bg_name and not bg_name.endswith(".png"):
-        bg_name += ".png"
+    if bg_name and not bg_name.lower().endswith((".png",".jpg",".jpeg",".webp")):
+        # Try to find matching file with any image extension
+        for ext in (".png",".jpg",".jpeg",".webp"):
+            if os.path.exists(os.path.join(BACKGROUNDS_DIR, bg_name + ext)):
+                bg_name += ext
+                break
     bg_path = os.path.join(BACKGROUNDS_DIR, bg_name) if bg_name else None
     if not bg_path or not os.path.exists(bg_path):
         bg_path = os.path.join(BACKGROUNDS_DIR, f"{category}.png")
@@ -671,8 +679,12 @@ PS_JOB = {
 
 def _run_ps_job(pairs, category, bg_name):
     import photoshop_engine
-    if bg_name and not bg_name.endswith(".png"):
-        bg_name += ".png"
+    if bg_name and not bg_name.lower().endswith((".png",".jpg",".jpeg",".webp")):
+        # Try to find matching file with any image extension
+        for ext in (".png",".jpg",".jpeg",".webp"):
+            if os.path.exists(os.path.join(BACKGROUNDS_DIR, bg_name + ext)):
+                bg_name += ext
+                break
     bg_path = os.path.join(BACKGROUNDS_DIR, bg_name) if bg_name else None
     if not bg_path or not os.path.exists(bg_path):
         bg_path = os.path.join(BACKGROUNDS_DIR, f"{category}.png")
@@ -951,8 +963,12 @@ def api_codex_run():
     bg_name  = data.get("bg", "")
     pairs    = _derive_pairs_from_disk()
 
-    if bg_name and not bg_name.endswith(".png"):
-        bg_name += ".png"
+    if bg_name and not bg_name.lower().endswith((".png",".jpg",".jpeg",".webp")):
+        # Try to find matching file with any image extension
+        for ext in (".png",".jpg",".jpeg",".webp"):
+            if os.path.exists(os.path.join(BACKGROUNDS_DIR, bg_name + ext)):
+                bg_name += ext
+                break
     bg_path = os.path.join(BACKGROUNDS_DIR, bg_name) if bg_name else None
     if not bg_path or not os.path.exists(bg_path):
         bg_path = os.path.join(BACKGROUNDS_DIR, f"{category}.png")
@@ -1082,8 +1098,12 @@ def api_compare_test():
     jewel  = os.path.join(folder, pair["jewel"])
     tag    = os.path.join(folder, pair["tag"]) if pair.get("tag") else jewel
 
-    if bg_name and not bg_name.endswith(".png"):
-        bg_name += ".png"
+    if bg_name and not bg_name.lower().endswith((".png",".jpg",".jpeg",".webp")):
+        # Try to find matching file with any image extension
+        for ext in (".png",".jpg",".jpeg",".webp"):
+            if os.path.exists(os.path.join(BACKGROUNDS_DIR, bg_name + ext)):
+                bg_name += ext
+                break
     bg_path = os.path.join(BACKGROUNDS_DIR, bg_name) if bg_name else None
     if not bg_path or not os.path.exists(bg_path):
         bg_path = os.path.join(BACKGROUNDS_DIR, f"{category}.png")

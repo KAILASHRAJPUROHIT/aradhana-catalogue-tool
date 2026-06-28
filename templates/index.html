@@ -616,6 +616,17 @@ async function runGemini() {
   startPolling();
 }
 
+async function runCodex() {
+  const cat = document.getElementById('catSelect').value;
+  if (!cat) { alert('Select ornament type first.'); return; }
+  _setBtns(true);
+  _startProgress('Starting Codex engine…');
+  await fetch('/api/codex_run', {method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({category: cat, bg: _selBg || ''})});
+  startPolling();
+}
+
 async function runParallel() {
   const cat = document.getElementById('catSelect').value;
   if (!cat) { alert('Select ornament type first.'); return; }

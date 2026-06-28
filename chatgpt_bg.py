@@ -1546,8 +1546,15 @@ def process(jewel_path, tag_path, bg_path, is_first=False, category="jewellery",
         2. Checks for soft warning — signals 5-min cooldown if found.
         """
         # Delete chat right after confirmed save — keeps sidebar clean
-        if _current_chat_url and "/c/" in _current_chat_url:
-            _delete_chat(driver, _current_chat_url)
+        url_to_del = _current_chat_url
+        if not url_to_del or "/c/" not in url_to_del:
+            # Last-chance read of current URL
+            try:
+                url_to_del = driver.current_url
+            except Exception:
+                url_to_del = ""
+        if url_to_del and "/c/" in url_to_del:
+            _delete_chat(driver, url_to_del)
 
         warn = _detect_soft_warning(driver)
         if warn["warned"]:

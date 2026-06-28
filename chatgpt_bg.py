@@ -1153,13 +1153,17 @@ def process(jewel_path, tag_path, bg_path, is_first=False, category="jewellery",
     # Save chat URL after message sent (ChatGPT assigns /c/... now)
     # and increment rotation counter
     _chat_pair_count += 1
-    try:
-        time.sleep(1)   # brief wait for URL to update to /c/...
-        cur = driver.current_url
-        if "/c/" in cur:
-            _current_chat_url = cur
-    except Exception:
-        pass
+    # Poll up to 8s for ChatGPT to assign a /c/ conversation URL
+    for _ in range(8):
+        time.sleep(1)
+        try:
+            cur = driver.current_url
+            if "/c/" in cur:
+                _current_chat_url = cur
+                _status(f"{tag}💾 Chat URL saved: ...{cur[-12:]}")
+                break
+        except Exception:
+            break
 
     # Prompt sent — push Chrome to background now (generation runs fine minimised)
     _chrome_to_background()

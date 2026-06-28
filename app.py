@@ -92,7 +92,8 @@ def img(where, name):
 @app.route("/api/backgrounds")
 def api_backgrounds():
     bgs = sorted(f for f in os.listdir(BACKGROUNDS_DIR)
-                 if f.lower().endswith(".png") and not f.startswith("_"))
+                 if f.lower().endswith((".png",".jpg",".jpeg",".webp"))
+                 and not f.startswith("_"))
     return jsonify({"backgrounds": bgs})
 
 # ── Step 2 — upload images to input\ ─────────────────────────────────────────

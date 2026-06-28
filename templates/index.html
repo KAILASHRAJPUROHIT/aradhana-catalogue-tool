@@ -478,8 +478,9 @@ async function stageFiles() {
 // ── Step 5: Process ───────────────────────────────────────────────────────────
 
 function _setBtns(disabled) {
-  ['runBtn','geminiBtn','parallelBtn'].forEach(id => {
-    document.getElementById(id).disabled = disabled;
+  ['runBtn','geminiBtn','parallelBtn','codexBtn'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = disabled;
   });
   document.getElementById('stopBtn').style.display = disabled ? 'block' : 'none';
 }

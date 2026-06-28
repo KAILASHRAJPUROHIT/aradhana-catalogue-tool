@@ -1005,11 +1005,20 @@ def api_codex_run():
                 continue
 
             CGPT_JOB["current"] = f"Codex · pair {s['pair']}"
-            r = codex_img.generate(
-                jewel_path=jewel, tag_path=tag, bg_path=bg_path,
-                category=category, label=f"AJ-{s['pair']:03d}",
-                status_fn=lambda m: CGPT_JOB.update({"current": m})
-            )
+            r = {"error": "not started"}
+            for attempt in range(3):
+                r = codex_img.generate(
+                    jewel_path=jewel, tag_path=tag, bg_path=bg_path,
+                    category=category, label=f"AJ-{s['pair']:03d}",
+                    status_fn=lambda m: CGPT_JOB.update({"current": m})
+                )
+                err = r.get("error", "")
+                if "CODEX_RATE_LIMIT" in (err or ""):
+                    wait = 120  # 2 min cooldown on rate limit
+                    CGPT_JOB["current"] = f"⏳ Codex rate limited — cooling {wait}s"
+                    time.sleep(wait)
+                    continue
+                break
 
             label = r.get("label") or f"AJ-{s['pair']:03d}"
             safe  = re.sub(r'[/\\:*?"<>|]', '_', label)

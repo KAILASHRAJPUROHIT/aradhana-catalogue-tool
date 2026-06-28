@@ -72,7 +72,7 @@ def generate(jewel_path: str, tag_path: str, bg_path: str,
     )
 
     payload = {
-        "model": "gpt-4o",
+        "model": "gpt-5.5",
         "stream": True,
         "instructions": "You are an image generation assistant.",
         "input": [{

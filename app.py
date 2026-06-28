@@ -12,7 +12,7 @@ BASE            = r"C:\Users\kaila\Desktop\JewelleryCatalogTool"
 INPUT           = os.path.join(BASE, "input")
 PROCESSING      = os.path.join(BASE, "processing")
 OUTPUT          = os.path.join(BASE, "output_aradhana")
-BACKGROUNDS_DIR = os.path.join(BASE, "backgrounds")
+BACKGROUNDS_DIR = r"C:\Users\kaila\Desktop\Backgrounds\Watermarked"
 
 for d in (INPUT, PROCESSING, OUTPUT, BACKGROUNDS_DIR):
     os.makedirs(d, exist_ok=True)

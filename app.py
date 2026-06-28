@@ -14,8 +14,10 @@ PROCESSING      = os.path.join(BASE, "processing")
 OUTPUT          = os.path.join(BASE, "output_aradhana")
 BACKGROUNDS_DIR = r"C:\Users\kaila\Desktop\Backgrounds\Watermarked"
 
-for d in (INPUT, PROCESSING, OUTPUT, BACKGROUNDS_DIR):
+for d in (INPUT, PROCESSING, OUTPUT):
     os.makedirs(d, exist_ok=True)
+if not os.path.exists(BACKGROUNDS_DIR):
+    raise FileNotFoundError(f"Backgrounds folder not found: {BACKGROUNDS_DIR}")
 
 TYPES = [
     "earrings","ladies_rings","gents_rings",

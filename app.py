@@ -941,6 +941,91 @@ def api_chatgpt_progress():
     })
 
 
+@app.route("/api/codex_run", methods=["POST"])
+def api_codex_run():
+    if CGPT_JOB["running"]:
+        return jsonify({"error": "Already running"}), 400
+    data     = request.json or {}
+    category = data.get("category", "earrings")
+    bg_name  = data.get("bg", "")
+    pairs    = _derive_pairs_from_disk()
+
+    if bg_name and not bg_name.endswith(".png"):
+        bg_name += ".png"
+    bg_path = os.path.join(BACKGROUNDS_DIR, bg_name) if bg_name else None
+    if not bg_path or not os.path.exists(bg_path):
+        bg_path = os.path.join(BACKGROUNDS_DIR, f"{category}.png")
+    if not os.path.exists(bg_path):
+        bgs = [f for f in os.listdir(BACKGROUNDS_DIR) if f.endswith(".png")]
+        bg_path = os.path.join(BACKGROUNDS_DIR, bgs[0]) if bgs else None
+
+    CGPT_JOB.update({"running": True, "total": len(pairs), "done": 0,
+                     "results": [], "started": time.time(), "error": None,
+                     "current": f"🟢 Codex engine — {len(pairs)} pairs"})
+
+    def _run():
+        import codex_img, catalogue_db
+        progress = _load_progress(category)
+        out_dir  = os.path.join(OUTPUT, category)
+        os.makedirs(out_dir, exist_ok=True)
+        results  = []
+
+        for i, s in enumerate(pairs):
+            pair_key = str(s["pair"])
+            folder   = s.get("folder") or (PROCESSING if s.get("staged") else INPUT)
+            jewel    = os.path.join(folder, s["jewel"])
+            tag      = os.path.join(folder, s["tag"]) if s.get("tag") else jewel
+
+            if pair_key in progress and progress[pair_key].get("output"):
+                saved = progress[pair_key]
+                results.append({"pair": s["pair"], "sku": saved["label"],
+                                "output": saved["output"], "error": None,
+                                "skipped": True, "engine": "codex"})
+                CGPT_JOB["done"]    = i + 1
+                CGPT_JOB["results"] = results
+                continue
+
+            CGPT_JOB["current"] = f"Codex · pair {s['pair']}"
+            r = codex_img.generate(
+                jewel_path=jewel, tag_path=tag, bg_path=bg_path,
+                category=category, label=f"AJ-{s['pair']:03d}",
+                status_fn=lambda m: CGPT_JOB.update({"current": m})
+            )
+
+            label = r.get("label") or f"AJ-{s['pair']:03d}"
+            safe  = re.sub(r'[/\\:*?"<>|]', '_', label)
+            out_path = os.path.join(out_dir, f"{safe}_codex.png")
+
+            if r.get("output") and os.path.exists(r["output"]):
+                os.replace(r["output"], out_path)
+                jcheck = catalogue_db.verify_jewellery_present(out_path)
+                if not jcheck["ok"]:
+                    CGPT_JOB["current"] = f"⚠ No jewellery detected — skipping pair {s['pair']}"
+                    results.append({"pair": s["pair"], "sku": label, "output": None,
+                                   "error": f"Empty output: {jcheck['reason'][:60]}",
+                                   "engine": "codex"})
+                else:
+                    findings = catalogue_db.check_and_record(label, out_path, category)
+                    _save_progress(category, pair_key, label, f"{category}/{safe}_codex.png")
+                    results.append({"pair": s["pair"], "sku": label,
+                                   "output": f"{category}/{safe}_codex.png",
+                                   "error": None, "engine": "codex",
+                                   "duplicate": bool(findings),
+                                   "findings": findings})
+            else:
+                results.append({"pair": s["pair"], "sku": label, "output": None,
+                               "error": r.get("error", "failed"), "engine": "codex"})
+
+            CGPT_JOB["done"]    = i + 1
+            CGPT_JOB["results"] = results
+
+        CGPT_JOB["running"] = False
+        CGPT_JOB["current"] = "done"
+
+    threading.Thread(target=_run, daemon=True).start()
+    return jsonify({"started": True, "pairs": len(pairs)})
+
+
 @app.route("/api/gemini_run", methods=["POST"])
 def api_gemini_run():
     if GEMINI_JOB["running"]:

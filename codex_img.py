@@ -137,6 +137,9 @@ def generate(jewel_path: str, tag_path: str, bg_path: str,
 
     except urllib.error.HTTPError as e:
         body_txt = e.read().decode("utf-8", errors="replace")[:300]
+        # Tag rate limit errors so the caller can wait and retry
+        if e.code == 429 or "rate" in body_txt.lower() or "quota" in body_txt.lower():
+            return {"output": None, "label": label, "error": f"CODEX_RATE_LIMIT: {body_txt[:100]}"}
         return {"output": None, "label": label, "error": f"HTTP {e.code}: {body_txt}"}
     except Exception as e:
         return {"output": None, "label": label, "error": str(e)}

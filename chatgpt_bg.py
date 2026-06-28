@@ -588,44 +588,39 @@ _current_chat_url = ""       # URL of the chat currently in use
 def _delete_chat(driver, chat_url: str) -> bool:
     """
     Delete a ChatGPT conversation via its internal API.
-    Uses the browser's existing session cookies — no extra auth needed.
-    Returns True on success, False on failure (non-fatal).
+    Uses Python requests with browser cookies — works even when Chrome is off-screen.
     """
     if not chat_url or "/c/" not in chat_url:
         return False
     try:
-        # Extract conversation UUID from URL  e.g. /c/6a3e5c84-d694-83e8-...
         conv_id = chat_url.rstrip("/").split("/c/")[-1].split("?")[0]
         if not conv_id:
             return False
 
-        result = _safe_js(driver, f"""
-            return new Promise(resolve => {{
-                fetch('/backend-api/conversation/{conv_id}', {{
-                    method: 'DELETE',
-                    headers: {{
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Bearer ' + (
-                            document.cookie.split('; ')
-                            .find(c => c.startsWith('__Secure-next-auth.session-token'))
-                            ?.split('=')[1] || ''
-                        )
-                    }},
-                    credentials: 'include'
-                }})
-                .then(r => resolve(r.ok ? 'deleted' : 'err:' + r.status))
-                .catch(e => resolve('err:' + e));
-            }});
-        """, timeout=10)
+        import requests as _req
+        # Grab cookies from the browser session
+        cookies = {c["name"]: c["value"] for c in driver.get_cookies()}
+        ua = driver.execute_script("return navigator.userAgent;")
 
-        if result == "deleted":
-            _status(f"🗑 Chat deleted: ...{conv_id[-8:]}")
+        resp = _req.delete(
+            f"https://chatgpt.com/backend-api/conversation/{conv_id}",
+            headers={
+                "User-Agent":   ua,
+                "Content-Type": "application/json",
+                "Origin":       "https://chatgpt.com",
+                "Referer":      "https://chatgpt.com/",
+            },
+            cookies=cookies,
+            timeout=10,
+        )
+        if resp.status_code in (200, 204):
+            _status(f"🗑 Deleted: ...{conv_id[-8:]}")
             return True
         else:
-            _status(f"⚠ Chat delete failed: {result}")
+            _status(f"⚠ Delete {resp.status_code}: {resp.text[:60]}")
             return False
     except Exception as e:
-        _status(f"⚠ Chat delete error: {e}")
+        _status(f"⚠ Delete error: {e}")
         return False
 
 # Injected by app.py at startup — avoids circular import

@@ -1134,14 +1134,16 @@ def process(jewel_path, tag_path, bg_path, is_first=False, category="jewellery",
     except Exception as e:
         _status(f"{tag}⚠️ Prompt send error: {e}")
 
-    # Snapshot all image URLs that exist RIGHT NOW (uploaded inputs)
-    # so we can ignore them later and only grab the newly generated image
+    # Wait 4s for ChatGPT to convert uploaded blob URLs → estuary/content URLs,
+    # THEN snapshot so all uploaded file URLs are captured in _existing_srcs.
+    time.sleep(4)
     try:
         _existing_srcs = set(driver.execute_script("""
             return Array.from(document.querySelectorAll('img'))
                 .map(i => i.src || i.currentSrc || '')
                 .filter(s => s.length > 0);
         """) or [])
+        _status(f"{tag}📸 Snapshotted {len(_existing_srcs)} existing imgs")
     except Exception:
         _existing_srcs = set()
 

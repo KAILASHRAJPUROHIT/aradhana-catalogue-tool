@@ -336,7 +336,7 @@ def _run_chatgpt_job(pairs, category, bg_name):
     if not bg_path or not os.path.exists(bg_path):
         bg_path = os.path.join(BACKGROUNDS_DIR, f"{category}.png")
     if not os.path.exists(bg_path):
-        bgs = [f for f in os.listdir(BACKGROUNDS_DIR) if f.endswith(".png")]
+        bgs = [f for f in os.listdir(BACKGROUNDS_DIR) if f.lower().endswith((".png",".jpg",".jpeg",".webp"))]
         bg_path = os.path.join(BACKGROUNDS_DIR, bgs[0]) if bgs else None
 
     out_dir = os.path.join(OUTPUT, category)
@@ -550,7 +550,7 @@ def _run_gemini_job(pairs, category, bg_name):
     if not bg_path or not os.path.exists(bg_path):
         bg_path = os.path.join(BACKGROUNDS_DIR, f"{category}.png")
     if not os.path.exists(bg_path):
-        bgs = [f for f in os.listdir(BACKGROUNDS_DIR) if f.endswith(".png")]
+        bgs = [f for f in os.listdir(BACKGROUNDS_DIR) if f.lower().endswith((".png",".jpg",".jpeg",".webp"))]
         bg_path = os.path.join(BACKGROUNDS_DIR, bgs[0]) if bgs else None
 
     out_dir = os.path.join(OUTPUT, category)
@@ -677,7 +677,7 @@ def _run_ps_job(pairs, category, bg_name):
     if not bg_path or not os.path.exists(bg_path):
         bg_path = os.path.join(BACKGROUNDS_DIR, f"{category}.png")
     if not os.path.exists(bg_path):
-        bgs = [f for f in os.listdir(BACKGROUNDS_DIR) if f.endswith(".png")]
+        bgs = [f for f in os.listdir(BACKGROUNDS_DIR) if f.lower().endswith((".png",".jpg",".jpeg",".webp"))]
         bg_path = os.path.join(BACKGROUNDS_DIR, bgs[0]) if bgs else None
 
     out_dir = os.path.join(OUTPUT, category)
@@ -957,7 +957,7 @@ def api_codex_run():
     if not bg_path or not os.path.exists(bg_path):
         bg_path = os.path.join(BACKGROUNDS_DIR, f"{category}.png")
     if not os.path.exists(bg_path):
-        bgs = [f for f in os.listdir(BACKGROUNDS_DIR) if f.endswith(".png")]
+        bgs = [f for f in os.listdir(BACKGROUNDS_DIR) if f.lower().endswith((".png",".jpg",".jpeg",".webp"))]
         bg_path = os.path.join(BACKGROUNDS_DIR, bgs[0]) if bgs else None
 
     CGPT_JOB.update({"running": True, "total": len(pairs), "done": 0,
@@ -1088,7 +1088,7 @@ def api_compare_test():
     if not bg_path or not os.path.exists(bg_path):
         bg_path = os.path.join(BACKGROUNDS_DIR, f"{category}.png")
     if not os.path.exists(bg_path):
-        bgs = [f for f in os.listdir(BACKGROUNDS_DIR) if f.endswith(".png")]
+        bgs = [f for f in os.listdir(BACKGROUNDS_DIR) if f.lower().endswith((".png",".jpg",".jpeg",".webp"))]
         bg_path = os.path.join(BACKGROUNDS_DIR, bgs[0]) if bgs else None
 
     COMPARE_RESULT.update({"running": True, "chatgpt": None, "gemini": None, "error": None})

@@ -1051,32 +1051,28 @@ def api_codex_run():
                 entry.update({"output": f"{category}/{safe}.jpg", "error": None,
                               "duplicate": bool(findings), "findings": findings or []})
 
-                # ── Model shoot variants ───────────────────────────────────────
+                # ── Model shoot variants via Codex ────────────────────────────
                 if model_cfg.get("enabled") and not bool(findings):
                     try:
-                        import model_engine
-                        cfg       = model_engine.get_shot_config(
-                            category, model_cfg.get("bodyPart", "auto"))
-                        n_variants = int(model_cfg.get("variants", 3))
+                        import model_engine, codex_img
+                        n_variants   = int(model_cfg.get("variants", 3))
                         model_outputs = []
 
                         for v in range(1, n_variants + 1):
                             CGPT_JOB["current"] = (
-                                f"Model shoot {v}/{n_variants} · {label} · {cfg['scene']}")
+                                f"Model shoot {v}/{n_variants} · {label}")
                             prompt = model_engine.build_model_prompt(
-                                category, f"{label}_M{v}", cfg, v)
+                                category, label, v)
 
-                            # Use ChatGPT browser for model images
-                            import chatgpt_bg
-                            _d = chatgpt_bg.connect()
-                            chatgpt_bg.start_batch_chat(_d)
-                            mr = chatgpt_bg.process(
+                            # Use Codex with jewellery image as input
+                            # Override the prompt in codex_img by patching temporarily
+                            mr = codex_img.generate(
                                 jewel_path=jewel,
                                 tag_path=tag or jewel,
-                                bg_path=out_path,   # use studio shot as ref
+                                bg_path=jewel,      # jewel as main reference for model
                                 category=category,
-                                pair_num=f"M{v}",
-                                job_id=f"{label}_model{v}",
+                                label=f"{label}_model_{v}",
+                                model_prompt_override=prompt,
                             )
                             if mr.get("output") and os.path.exists(mr["output"]):
                                 model_path = os.path.join(

@@ -532,6 +532,47 @@ select option { background: #1a1d26; }
     <div id="stagedGrid" class="pairs-grid" style="display:none;margin-top:12px"></div>
   </div>
 
+  <!-- STEP 4B: MODEL SHOOT SETTINGS -->
+  <div class="panel">
+    <div class="section-hdr">
+      <div class="section-title"><span class="step-num" style="background:var(--gem)">M</span> Model shoot <span style="font-weight:400;color:var(--text-muted);font-size:12px">(optional — generates 3 lifestyle variants per item)</span></div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+        <input type="checkbox" id="modelEnabled" onchange="toggleModelSettings()" style="accent-color:var(--gem)">
+        Enable model version
+      </label>
+    </div>
+    <div id="modelSettings" style="display:none">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:4px">
+        <div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">Body part / shot type</div>
+          <select id="bodyPartSelect" style="width:100%">
+            <option value="auto">Auto (based on category)</option>
+            <option value="ear">Ear closeup</option>
+            <option value="neck">Neck / chest</option>
+            <option value="hand">Hand / fingers</option>
+            <option value="wrist">Wrist / bangles</option>
+            <option value="feet">Feet / anklets</option>
+            <option value="nose">Nose closeup</option>
+            <option value="chest">Chest / décolletage</option>
+          </select>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">Variants per item</div>
+          <select id="variantCount" style="width:100%">
+            <option value="1">1 variant</option>
+            <option value="2">2 variants</option>
+            <option value="3" selected>3 variants</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:10px;padding:10px;background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.2);border-radius:8px;font-size:12px;color:var(--text-muted)">
+        <i class="fa-solid fa-circle-info" style="color:var(--gem);margin-right:6px"></i>
+        Model images use ChatGPT browser engine. Each item generates studio version + model variants.
+        Model is always an elegant Indian professional with Aradhana Jewellers watermark.
+      </div>
+    </div>
+  </div>
+
   <!-- STEP 5: PROCESS -->
   <div class="panel" id="processSection">
     <div class="section-hdr">

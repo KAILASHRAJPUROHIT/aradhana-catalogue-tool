@@ -2,9 +2,19 @@
 ChatGPT Plus → image generation via backend-api/codex/responses.
 Uses the OAuth token from ~/.codex/auth.json (no API key, no extra cost).
 Windows-compatible — no fcntl dependency.
+Optimised: requests.Session(), 768px input, parallel-safe.
 """
 import sys, os, json, base64, time, urllib.request, urllib.error
+import requests as _requests
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
+# Shared session — reuses TLS connection, saves ~200ms per request
+_SESSION = _requests.Session()
+_SESSION.headers.update({
+    "Content-Type":  "application/json",
+    "Accept":        "text/event-stream",
+    "User-Agent":    "chatgpt-imagegen/0.16.1",
+})
 
 BASE = r"C:\Users\kaila\Desktop\JewelleryCatalogTool"
 OUTPUT = os.path.join(BASE, "output_aradhana")

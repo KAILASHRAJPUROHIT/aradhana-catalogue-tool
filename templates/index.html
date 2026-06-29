@@ -3,642 +3,777 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Auto Catalogue Tool — Aradhana Jewellers</title>
+<title>Aradhana Catalogue Studio</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: 'Segoe UI', sans-serif;
-    background: #0d1117;
-    color: #e6edf3;
-    min-height: 100vh;
-  }
-  header {
-    background: #161b22;
-    border-bottom: 1px solid #30363d;
-    padding: 14px 32px;
-    display: flex;
-    align-items: baseline;
-    gap: 12px;
-  }
-  header h1 {
-    font-size: 18px;
-    font-weight: 700;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    color: #c9a84c;
-  }
-  header h1 span { color: #fff; }
-  header small {
-    font-size: 11px;
-    color: #8b949e;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-  }
-  .container { max-width: 900px; margin: 0 auto; padding: 32px 20px; }
+:root {
+  --gold: #CCA137;
+  --gold-light: #F7CA5B;
+  --gold-dim: #7a5f20;
+  --bg: #0a0b0d;
+  --bg-card: #111318;
+  --bg-card2: #16191f;
+  --bg-hover: #1c2028;
+  --border: #1f2330;
+  --border-light: #2a3040;
+  --text: #e8eaf0;
+  --text-muted: #6b7280;
+  --text-dim: #4b5263;
+  --success: #22c55e;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --info: #3b82f6;
+  --gem: #8b5cf6;
+  --radius: 10px;
+  --radius-lg: 14px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; }
 
-  .card {
-    background: #161b22;
-    border: 1px solid #30363d;
-    border-radius: 10px;
-    padding: 22px 26px;
-    margin-bottom: 18px;
-  }
-  .card-title {
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    color: #8b949e;
-    margin-bottom: 14px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .card-title .num {
-    background: #c9a84c;
-    color: #000;
-    border-radius: 50%;
-    width: 20px; height: 20px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 11px;
-    font-weight: 800;
-    flex-shrink: 0;
-  }
+/* ── TOP NAV ── */
+.topnav {
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  padding: 0 28px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.nav-logo {
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-light) 100%);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 800;
+  color: #000;
+}
+.nav-title { font-size: 15px; font-weight: 600; color: var(--text); }
+.nav-sub { font-size: 11px; color: var(--text-muted); margin-left: 4px; }
+.nav-status {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.status-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-card2);
+  border: 1px solid var(--border);
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+}
+.status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-dim); }
+.status-dot.green { background: var(--success); box-shadow: 0 0 6px var(--success); }
+.status-dot.amber { background: var(--warning); box-shadow: 0 0 6px var(--warning); }
 
-  /* Buttons */
-  .btn {
-    display: inline-block;
-    padding: 9px 18px;
-    border-radius: 6px;
-    border: none;
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: 600;
-    transition: opacity 0.15s;
-  }
-  .btn:hover { opacity: 0.85; }
-  .btn-gold { background: #c9a84c; color: #000; }
-  .btn-outline { background: transparent; border: 1px solid #30363d; color: #e6edf3; }
-  .btn-outline:hover { border-color: #c9a84c; color: #c9a84c; }
-  .btn-danger { background: #da3633; color: #fff; }
-  .btn-big {
-    padding: 13px 32px;
-    font-size: 15px;
-    letter-spacing: 1px;
-    width: 100%;
-  }
+/* ── LAYOUT ── */
+.app-body { display: flex; flex: 1; overflow: hidden; }
 
-  /* Step 1 — Load */
-  .load-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-  .load-info { font-size: 13px; color: #8b949e; margin-top: 10px; }
-  .pairs-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-    gap: 10px;
-    margin-top: 14px;
-  }
-  .pair-thumb {
-    background: #0d1117;
-    border: 1px solid #30363d;
-    border-radius: 6px;
-    padding: 8px;
-    font-size: 11px;
-    color: #8b949e;
-    text-align: center;
-  }
-  .pair-thumb img { width: 100%; border-radius: 4px; margin-bottom: 4px; }
+/* ── SIDEBAR ── */
+.sidebar {
+  width: 240px;
+  background: var(--bg-card);
+  border-right: 1px solid var(--border);
+  padding: 20px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.sidebar-section {
+  padding: 8px 16px 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 20px;
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-left: 2px solid transparent;
+  transition: all 0.15s;
+}
+.sidebar-item:hover { background: var(--bg-hover); color: var(--text); }
+.sidebar-item.active { background: var(--bg-hover); color: var(--gold); border-left-color: var(--gold); }
+.sidebar-item i { width: 16px; text-align: center; font-size: 14px; }
+.sidebar-badge {
+  margin-left: auto;
+  background: var(--gold);
+  color: #000;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 10px;
+}
 
-  /* Step 2 — Category */
-  select {
-    background: #0d1117;
-    border: 1px solid #30363d;
-    border-radius: 6px;
-    color: #e6edf3;
-    padding: 9px 14px;
-    font-size: 13px;
-    cursor: pointer;
-    min-width: 200px;
-  }
-  select:focus { outline: none; border-color: #c9a84c; }
-  .cat-confirm { margin-left: 12px; color: #3fb950; font-size: 13px; }
+/* ── MAIN CONTENT ── */
+.main { flex: 1; overflow-y: auto; padding: 24px 28px; display: flex; flex-direction: column; gap: 20px; }
 
-  /* Step 3 — Background */
-  .bg-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-    gap: 8px;
-    margin-top: 4px;
-  }
-  .bg-thumb {
-    position: relative;
-    cursor: pointer;
-    border-radius: 6px;
-    overflow: hidden;
-    border: 2px solid transparent;
-    transition: border-color 0.15s;
-    aspect-ratio: 1;
-  }
-  .bg-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .bg-thumb .bg-label {
-    position: absolute;
-    bottom: 0; left: 0; right: 0;
-    background: rgba(0,0,0,0.65);
-    font-size: 9px;
-    color: #ccc;
-    text-align: center;
-    padding: 2px 3px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .bg-thumb.selected { border-color: #c9a84c; }
-  .bg-confirm { margin-top: 8px; color: #3fb950; font-size: 13px; }
+/* ── STATS ROW ── */
+.stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.stat-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  position: relative;
+  overflow: hidden;
+}
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--accent-color, var(--border));
+}
+.stat-card.gold::before { background: var(--gold); }
+.stat-card.green::before { background: var(--success); }
+.stat-card.blue::before { background: var(--info); }
+.stat-card.purple::before { background: var(--gem); }
+.stat-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px; }
+.stat-value { font-size: 26px; font-weight: 700; color: var(--text); line-height: 1; }
+.stat-sub { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
 
-  /* Step 4 — Stage */
-  .stage-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
-  .stage-info { font-size: 13px; color: #8b949e; }
+/* ── SECTION HEADER ── */
+.section-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.section-title { font-size: 13px; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 8px; }
+.section-title i { color: var(--gold); }
+.step-num {
+  width: 22px; height: 22px;
+  background: var(--gold);
+  color: #000;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
 
-  /* Step 5 — Process */
-  .progress-bar-wrap {
-    background: #0d1117;
-    border-radius: 4px;
-    height: 6px;
-    margin: 12px 0 8px;
-    overflow: hidden;
-  }
-  .progress-bar-fill {
-    height: 100%;
-    background: #c9a84c;
-    border-radius: 4px;
-    transition: width 0.4s ease;
-    width: 0%;
-  }
-  .progress-status {
-    font-size: 12px;
-    color: #8b949e;
-    display: flex;
-    gap: 16px;
-    flex-wrap: wrap;
-  }
-  .progress-status .cur { color: #e6edf3; flex: 1; }
+/* ── PANEL ── */
+.panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px 22px;
+}
 
-  /* Results */
-  .results-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 10px;
-    margin-top: 14px;
-  }
-  .result-card {
-    background: #0d1117;
-    border: 1px solid #30363d;
-    border-radius: 6px;
-    padding: 8px;
-    font-size: 11px;
-    text-align: center;
-  }
-  .result-card img { width: 100%; border-radius: 4px; margin-bottom: 5px; }
-  .result-card .sku { color: #c9a84c; font-weight: 700; word-break: break-all; }
-  .result-card .err { color: #f85149; word-break: break-all; }
-  .result-card .ok { color: #3fb950; }
+/* ── UPLOAD ZONE ── */
+.upload-zone {
+  border: 1.5px dashed var(--border-light);
+  border-radius: var(--radius);
+  padding: 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.upload-zone:hover { border-color: var(--gold-dim); background: rgba(204,161,55,0.04); color: var(--text); }
+.upload-zone i { font-size: 24px; color: var(--text-dim); margin-bottom: 8px; display: block; }
+
+/* ── BUTTONS ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-gold { background: var(--gold); color: #000; }
+.btn-gold:hover:not(:disabled) { background: var(--gold-light); }
+.btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border-light); }
+.btn-ghost:hover:not(:disabled) { background: var(--bg-hover); color: var(--text); border-color: var(--border-light); }
+.btn-danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
+.btn-danger:hover:not(:disabled) { background: rgba(239,68,68,0.1); }
+.btn-success { background: transparent; color: var(--success); border: 1px solid var(--success); }
+.btn-success:hover:not(:disabled) { background: rgba(34,197,94,0.1); }
+.btn-gem { background: transparent; color: var(--gem); border: 1px solid var(--gem); }
+.btn-gem:hover:not(:disabled) { background: rgba(139,92,246,0.1); }
+.btn-info { background: transparent; color: var(--info); border: 1px solid var(--info); }
+.btn-info:hover:not(:disabled) { background: rgba(59,130,246,0.1); }
+.btn-sm { padding: 6px 12px; font-size: 12px; }
+.btn-icon { padding: 8px; }
+.engine-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ── SELECT / FORM ── */
+select, input[type=text] {
+  background: var(--bg-card2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+select:focus, input[type=text]:focus { border-color: var(--gold-dim); }
+select option { background: #1a1d26; }
+
+/* ── BG GRID ── */
+.bg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 8px; margin-top: 12px; }
+.bg-tile {
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+  aspect-ratio: 1;
+  background: var(--bg-card2);
+  position: relative;
+}
+.bg-tile:hover { border-color: var(--gold-dim); }
+.bg-tile.selected { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold); }
+.bg-tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.bg-tile .tile-name {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  padding: 3px 4px;
+  font-size: 9px;
+  background: rgba(0,0,0,0.7);
+  color: #fff;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── PAIRS GRID ── */
+.pairs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; margin-top: 12px; }
+.pair-card {
+  background: var(--bg-card2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 8px 8px;
+  text-align: center;
+  font-size: 11px;
+}
+.pair-card img { width: 60px; height: 60px; object-fit: cover; border-radius: 5px; margin-bottom: 5px; }
+.pair-card .pair-num { color: var(--gold); font-weight: 700; font-size: 10px; }
+.pair-card .pair-name { color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── PROGRESS ── */
+.progress-wrap {
+  background: var(--bg-card2);
+  border-radius: 100px;
+  height: 4px;
+  overflow: hidden;
+  margin: 10px 0;
+}
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--gold), var(--gold-light));
+  border-radius: 100px;
+  transition: width 0.4s ease;
+  width: 0%;
+}
+.progress-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-muted);
+  gap: 16px;
+}
+.progress-status { flex: 1; font-size: 12px; color: var(--text); }
+.slots-badge {
+  font-size: 11px;
+  color: var(--gold);
+  background: rgba(204,161,55,0.1);
+  border: 1px solid rgba(204,161,55,0.2);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+/* ── RESULTS GALLERY ── */
+.results-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; margin-top: 4px; }
+.result-card {
+  background: var(--bg-card2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  transition: all 0.15s;
+  position: relative;
+}
+.result-card:hover { border-color: var(--border-light); transform: translateY(-1px); }
+.result-card.flagged { border-color: var(--warning); }
+.result-card.duplicate { border-color: var(--danger); }
+.result-card.error-state { border-color: var(--danger); opacity: 0.7; }
+.result-img { width: 100%; aspect-ratio: 1; object-fit: cover; background: var(--bg); display: block; }
+.result-img-placeholder { width: 100%; aspect-ratio: 1; background: var(--bg); display: flex; align-items: center; justify-content: center; font-size: 28px; color: var(--text-dim); }
+.result-body { padding: 10px 10px 8px; }
+.result-sku { font-size: 12px; font-weight: 700; color: var(--gold); margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.result-meta { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
+.result-badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+.badge-ok { background: rgba(34,197,94,0.15); color: var(--success); }
+.badge-dup { background: rgba(239,68,68,0.15); color: var(--danger); }
+.badge-flag { background: rgba(245,158,11,0.15); color: var(--warning); }
+.badge-skip { background: rgba(107,114,128,0.15); color: var(--text-muted); }
+.badge-err { background: rgba(239,68,68,0.15); color: var(--danger); }
+.badge-codex { background: rgba(34,197,94,0.12); color: var(--success); font-size: 9px; }
+.badge-gem { background: rgba(59,130,246,0.12); color: var(--info); font-size: 9px; }
+.result-actions { padding: 0 10px 10px; display: flex; gap: 6px; }
+.result-actions .btn { flex: 1; justify-content: center; padding: 5px 8px; font-size: 11px; }
+
+/* ── ERROR LOG ── */
+.error-log {
+  background: rgba(239,68,68,0.06);
+  border: 1px solid rgba(239,68,68,0.2);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  font-size: 11px;
+  font-family: monospace;
+  color: var(--danger);
+  max-height: 140px;
+  overflow-y: auto;
+  display: none;
+}
+.error-log-hdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; font-family: 'Segoe UI', sans-serif; font-size: 11px; font-weight: 600; }
+
+/* ── CHROME PREVIEW ── */
+.preview-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 8px; }
+.preview-pane { background: var(--bg-card2); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.preview-label { padding: 6px 10px; font-size: 11px; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.preview-img { width: 100%; display: block; cursor: crosshair; }
+
+/* ── STEP CONNECTOR ── */
+.step-connector { display: flex; align-items: center; gap: 8px; padding: 4px 0; color: var(--text-dim); font-size: 11px; }
+.step-connector::before, .step-connector::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+/* ── ADMIN ROW ── */
+.admin-row { display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding-top: 8px; border-top: 1px solid var(--border); margin-top: 8px; }
 </style>
 </head>
 <body>
 
-<header>
-  <h1><span>AUTO</span> CATALOGUE <span>TOOL</span></h1>
-  <small>Aradhana Jewellers &bull; EST. 1992</small>
-</header>
+<!-- TOP NAV -->
+<nav class="topnav">
+  <div class="nav-brand">
+    <div class="nav-logo">AJ</div>
+    <span class="nav-title">Aradhana Catalogue Studio</span>
+    <span class="nav-sub">EST. 1992</span>
+  </div>
+  <div class="nav-status">
+    <div class="status-pill" id="serverPill">
+      <span class="status-dot green" id="serverDot"></span>
+      <span id="serverLabel">Server online</span>
+    </div>
+    <div class="status-pill" id="slotsPill" style="display:none">
+      <i class="fa-solid fa-bolt" style="font-size:10px;color:var(--gold)"></i>
+      <span id="slotsLabel">—</span>
+    </div>
+  </div>
+</nav>
 
-<div class="container">
+<div class="app-body">
 
-  <!-- Step 1: Load -->
-  <div class="card">
-    <div class="card-title"><span class="num">1</span> LOAD BATCH</div>
-    <div class="load-row">
-      <button class="btn btn-gold" onclick="loadFromInput()">Load from input\</button>
-      <label class="btn btn-outline" style="cursor:pointer">
-        Choose files…<input type="file" id="fileInput" multiple accept=".jpg,.jpeg,.png" style="display:none" onchange="uploadFiles(this.files)">
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-section">Workflow</div>
+  <div class="sidebar-item active" onclick="scrollTo(0,0)">
+    <i class="fa-solid fa-layer-group"></i> Batch Setup
+  </div>
+  <div class="sidebar-item" onclick="document.getElementById('processSection').scrollIntoView({behavior:'smooth'})">
+    <i class="fa-solid fa-wand-magic-sparkles"></i> Process
+  </div>
+  <div class="sidebar-item" onclick="document.getElementById('gallerySection').scrollIntoView({behavior:'smooth'})">
+    <i class="fa-solid fa-images"></i> Gallery
+    <span class="sidebar-badge" id="sidebarCount" style="display:none">0</span>
+  </div>
+
+  <div class="sidebar-section" style="margin-top:12px">Tools</div>
+  <div class="sidebar-item" onclick="togglePreview()">
+    <i class="fa-solid fa-display"></i> Chrome Preview
+  </div>
+  <div class="sidebar-item" onclick="newChat()">
+    <i class="fa-solid fa-rotate"></i> New Chat
+  </div>
+
+  <div class="sidebar-section" style="margin-top:12px">Admin</div>
+  <div class="sidebar-item" onclick="resetDuplicateDB()">
+    <i class="fa-solid fa-trash-can"></i> Reset Duplicates
+  </div>
+
+  <div style="margin-top:auto;padding:16px 20px;font-size:11px;color:var(--text-dim);border-top:1px solid var(--border)">
+    <div style="color:var(--text-muted);font-weight:600;margin-bottom:4px">Aradhana Jewellers</div>
+    Legacy of Purity.<br>Promise of Trust.
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+
+  <!-- STATS -->
+  <div class="stats-row">
+    <div class="stat-card gold">
+      <div class="stat-label">Queue</div>
+      <div class="stat-value" id="statQueue">—</div>
+      <div class="stat-sub">pairs loaded</div>
+    </div>
+    <div class="stat-card green">
+      <div class="stat-label">Processed</div>
+      <div class="stat-value" id="statDone">0</div>
+      <div class="stat-sub">this session</div>
+    </div>
+    <div class="stat-card blue">
+      <div class="stat-label">Slots</div>
+      <div class="stat-value" id="statSlots">50</div>
+      <div class="stat-sub">ChatGPT remaining</div>
+    </div>
+    <div class="stat-card purple">
+      <div class="stat-label">ETA</div>
+      <div class="stat-value" id="statEta">—</div>
+      <div class="stat-sub">to complete</div>
+    </div>
+  </div>
+
+  <!-- STEP 1: LOAD -->
+  <div class="panel">
+    <div class="section-hdr">
+      <div class="section-title"><span class="step-num">1</span> Load images</div>
+      <span id="loadInfo" style="font-size:12px;color:var(--text-muted)"></span>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-gold" onclick="loadFromInput()">
+        <i class="fa-solid fa-folder-open"></i> Load from input\
+      </button>
+      <label class="btn btn-ghost" style="cursor:pointer">
+        <i class="fa-solid fa-upload"></i> Choose files
+        <input type="file" id="fileInput" multiple accept=".jpg,.jpeg,.png" style="display:none" onchange="uploadFiles(this.files)">
       </label>
-      <label class="btn btn-outline" style="cursor:pointer">
-        Choose folder…<input type="file" id="folderInput" multiple accept=".jpg,.jpeg,.png" webkitdirectory style="display:none" onchange="uploadFiles(this.files)">
+      <label class="btn btn-ghost" style="cursor:pointer">
+        <i class="fa-solid fa-folder-plus"></i> Choose folder
+        <input type="file" id="folderInput" multiple accept=".jpg,.jpeg,.png" webkitdirectory style="display:none" onchange="uploadFiles(this.files)">
       </label>
-      <span id="loadInfo" class="load-info"></span>
     </div>
     <div id="pairsGrid" class="pairs-grid" style="display:none"></div>
   </div>
 
-  <!-- Step 2: Category -->
-  <div class="card">
-    <div class="card-title"><span class="num">2</span> ORNAMENT TYPE <span style="color:#da3633;font-size:10px">* required</span></div>
-    <select id="catSelect" onchange="onCatChange()">
+  <!-- STEP 2: CATEGORY -->
+  <div class="panel">
+    <div class="section-hdr">
+      <div class="section-title"><span class="step-num">2</span> Ornament type <span style="color:var(--danger);font-size:11px">*</span></div>
+      <span id="catConfirm" style="font-size:12px;color:var(--success)"></span>
+    </div>
+    <select id="catSelect" onchange="onCatChange()" style="width:260px">
       <option value="">— select type —</option>
       {% for t in types %}
       <option value="{{ t }}">{{ t.replace('_',' ').title() }}</option>
       {% endfor %}
     </select>
-    <span id="catConfirm" class="cat-confirm"></span>
   </div>
 
-  <!-- Step 3: Background -->
-  <div class="card">
-    <div class="card-title"><span class="num">3</span> BACKGROUND <span style="font-weight:400;color:#8b949e">(auto-matches category, or pick manually)</span></div>
-    <div id="bgConfirm" class="bg-confirm" style="margin-bottom:8px"></div>
+  <!-- STEP 3: BACKGROUND -->
+  <div class="panel">
+    <div class="section-hdr">
+      <div class="section-title"><span class="step-num">3</span> Background</div>
+      <span id="bgConfirm" style="font-size:12px;color:var(--gold)"></span>
+    </div>
     <div id="bgGrid" class="bg-grid"></div>
     <div style="margin-top:10px;display:flex;align-items:center;gap:10px">
-      <label class="btn btn-outline" style="cursor:pointer;font-size:12px;padding:8px 14px">
-        📁 Browse for Background…
-        <input type="file" id="bgBrowse" accept=".jpg,.jpeg,.png,.webp"
-               style="display:none" onchange="uploadCustomBg(this)">
+      <label class="btn btn-ghost btn-sm" style="cursor:pointer">
+        <i class="fa-solid fa-folder-open"></i> Browse…
+        <input type="file" id="bgBrowse" accept=".jpg,.jpeg,.png,.webp" style="display:none" onchange="uploadCustomBg(this)">
       </label>
-      <span id="bgBrowseInfo" style="color:#8b949e;font-size:12px"></span>
+      <span id="bgBrowseInfo" style="font-size:12px;color:var(--text-muted)"></span>
     </div>
   </div>
 
-  <!-- Step 4: Stage -->
-  <div class="card">
-    <div class="card-title"><span class="num">4</span> RENAME &amp; STAGE <span style="font-weight:400;color:#8b949e">(optional)</span></div>
-    <div class="stage-row">
-      <button class="btn btn-outline" onclick="stageFiles()">Rename &amp; move to processing\</button>
-      <span id="stageInfo" class="stage-info"></span>
+  <!-- STEP 4: STAGE -->
+  <div class="panel">
+    <div class="section-hdr">
+      <div class="section-title"><span class="step-num">4</span> Stage pairs <span style="font-weight:400;color:var(--text-muted);font-size:12px">(optional)</span></div>
+      <span id="stageInfo" style="font-size:12px;color:var(--text-muted)"></span>
     </div>
+    <button class="btn btn-ghost" onclick="stageFiles()">
+      <i class="fa-solid fa-arrow-right-to-bracket"></i> Rename & move to processing\
+    </button>
     <div id="stagedGrid" class="pairs-grid" style="display:none;margin-top:12px"></div>
   </div>
 
-  <!-- Step 5: Process -->
-  <div class="card">
-    <div class="card-title"><span class="num">5</span> PROCESS</div>
-    <div style="display:flex;gap:10px;flex-wrap:wrap">
-      <button class="btn btn-gold btn-big" id="runBtn" onclick="runChatGPT()" style="flex:1">
-        &#9654; ChatGPT
+  <!-- STEP 5: PROCESS -->
+  <div class="panel" id="processSection">
+    <div class="section-hdr">
+      <div class="section-title"><span class="step-num">5</span> Process</div>
+    </div>
+
+    <div class="engine-row">
+      <button class="btn btn-gold" id="runBtn" onclick="runChatGPT()">
+        <i class="fa-solid fa-play"></i> ChatGPT
       </button>
-      <button class="btn btn-outline btn-big" id="geminiBtn" onclick="runGemini()" style="flex:1;border-color:#4285f4;color:#4285f4">
-        &#9654; Gemini
+      <button class="btn btn-info" id="geminiBtn" onclick="runGemini()">
+        <i class="fa-solid fa-play"></i> Gemini
       </button>
-      <button class="btn btn-outline btn-big" id="parallelBtn" onclick="runParallel()" style="flex:1;border-color:#a371f7;color:#a371f7">
-        &#9654;&#9654; Unified
+      <button class="btn btn-gem" id="codexBtn" onclick="runCodex()">
+        <i class="fa-solid fa-bolt"></i> Codex
       </button>
-      <button class="btn btn-outline btn-big" id="codexBtn" onclick="runCodex()" style="flex:1;border-color:#3fb950;color:#3fb950">
-        &#9654; Codex
+      <button class="btn btn-ghost" id="parallelBtn" onclick="runParallel()">
+        <i class="fa-solid fa-forward-fast"></i> Unified
       </button>
-      <button class="btn btn-outline btn-big" id="stopBtn" onclick="stopRun()"
-              style="flex:1;border-color:#f85149;color:#f85149;display:none">
-        &#9632; Stop
+      <button class="btn btn-danger" id="stopBtn" onclick="stopRun()" style="display:none">
+        <i class="fa-solid fa-stop"></i> Stop
       </button>
     </div>
-    <!-- Live Chrome previews -->
+
+    <!-- PROGRESS -->
+    <div id="progressSection" style="display:none;margin-top:16px">
+      <div class="progress-wrap">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+      <div class="progress-row" style="margin-top:8px">
+        <span class="progress-status" id="statusCur"></span>
+        <span style="color:var(--text-muted);font-size:12px" id="statusCount"></span>
+        <span style="color:var(--text-muted);font-size:12px" id="statusEta"></span>
+        <span style="color:var(--text-muted);font-size:12px" id="statusElapsed"></span>
+        <span class="slots-badge" id="statusSlots" style="display:none"></span>
+      </div>
+    </div>
+
+    <!-- CHROME PREVIEW (hidden by default) -->
     <div id="previewSection" style="display:none;margin-top:16px">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div>
-          <div style="color:#cca137;font-size:11px;font-weight:700;margin-bottom:6px">
-            ChatGPT Chrome (port 9222)
-            <button onclick="clickPreview(event,9222)" style="float:right;background:none;border:1px solid #444;color:#888;font-size:10px;padding:2px 6px;cursor:crosshair;border-radius:3px">click mode</button>
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between">
+        <span><i class="fa-solid fa-display" style="margin-right:6px"></i>Live Chrome Preview — click anywhere to interact</span>
+      </div>
+      <div class="preview-grid">
+        <div class="preview-pane">
+          <div class="preview-label">
+            ChatGPT <span style="color:var(--gold)">9222</span>
+            <button class="btn btn-ghost btn-sm" onclick="clickPreview(event,9222)" style="font-size:10px;padding:2px 8px">click</button>
           </div>
-          <img id="preview9222" src="" onclick="handlePreviewClick(event,9222)"
-               style="width:100%;border-radius:6px;cursor:crosshair;border:1px solid #30363d"
-               onerror="this.style.opacity='0.3'">
+          <img id="preview9222" class="preview-img" src="" onclick="handlePreviewClick(event,9222)" onerror="this.style.opacity='0.2'">
         </div>
-        <div>
-          <div style="color:#4285f4;font-size:11px;font-weight:700;margin-bottom:6px">
-            Gemini Chrome (port 9223)
-            <button onclick="clickPreview(event,9223)" style="float:right;background:none;border:1px solid #444;color:#888;font-size:10px;padding:2px 6px;cursor:crosshair;border-radius:3px">click mode</button>
+        <div class="preview-pane">
+          <div class="preview-label">
+            Gemini <span style="color:var(--info)">9223</span>
+            <button class="btn btn-ghost btn-sm" onclick="clickPreview(event,9223)" style="font-size:10px;padding:2px 8px">click</button>
           </div>
-          <img id="preview9223" src="" onclick="handlePreviewClick(event,9223)"
-               style="width:100%;border-radius:6px;cursor:crosshair;border:1px solid #30363d"
-               onerror="this.style.opacity='0.3'">
+          <img id="preview9223" class="preview-img" src="" onclick="handlePreviewClick(event,9223)" onerror="this.style.opacity='0.2'">
         </div>
       </div>
     </div>
 
-    <div style="margin-top:10px;display:flex;align-items:center;gap:10px">
-      <button onclick="togglePreview()"
-              id="previewToggle"
-              style="background:none;border:1px solid #333;color:#555;font-size:11px;padding:5px 12px;border-radius:6px;cursor:pointer">
-        👁 Show Chrome Preview
+    <div class="admin-row">
+      <button class="btn btn-ghost btn-sm" onclick="togglePreview()" id="previewToggle">
+        <i class="fa-regular fa-eye"></i> Preview
       </button>
-    </div>
-
-    <div style="margin-top:10px;text-align:right">
-      <button onclick="resetDuplicateDB()"
-              style="background:none;border:1px solid #333;color:#555;font-size:11px;
-                     padding:5px 12px;border-radius:6px;cursor:pointer"
-              title="Admin: clear 30-day duplicate detection history">
-        🔒 Reset Duplicate History
+      <button class="btn btn-ghost btn-sm" onclick="newChat()">
+        <i class="fa-solid fa-rotate"></i> New Chat
       </button>
-    </div>
-
-    <!-- Progress bar — always visible once a run starts -->
-    <div class="progress-bar-wrap" id="progressWrap" style="display:none;margin-top:14px">
-      <div class="progress-bar-fill" id="progressFill" style="width:0%"></div>
-    </div>
-    <div class="progress-status" id="progressStatus" style="display:none">
-      <span class="cur" id="statusCur"></span>
-      <span id="statusCount"></span>
-      <span id="statusEta"></span>
-      <span id="statusElapsed"></span>
-      <span id="statusSlots" style="color:#f7ca5b;font-size:12px;margin-left:8px"></span>
-    </div>
-    <div id="resultsGrid" class="results-grid" style="display:none"></div>
-
-    <!-- Error log -->
-    <div id="errorLog" style="display:none;margin-top:16px;background:#1a0a0a;
-         border:1px solid #da3633;border-radius:6px;padding:12px;max-height:180px;overflow-y:auto">
-      <div style="color:#da3633;font-size:11px;font-weight:700;margin-bottom:6px">
-        ⚠ ERROR LOG
-        <button onclick="document.getElementById('errorLog').style.display='none'"
-                style="float:right;background:none;border:none;color:#555;cursor:pointer;font-size:11px">✕ clear</button>
-      </div>
-      <div id="errorLogBody" style="font-size:11px;color:#f85149;font-family:monospace;line-height:1.6"></div>
-    </div>
-
-    <!-- Side-by-side quality comparison panel -->
-    <div id="comparePanel" style="display:none;margin-top:24px">
-      <div style="color:#f0a500;font-weight:700;font-size:14px;margin-bottom:12px;letter-spacing:1px">
-        ⚖ QUALITY COMPARISON — SAME PAIR, BOTH ENGINES
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-        <div id="compareLeft" style="background:#161b22;border-radius:8px;padding:16px;border:1px solid #30363d">
-          <div style="color:#cca137;font-weight:700;margin-bottom:8px">ChatGPT (GPT Image 1.5)</div>
-          <div id="cgptStatus" style="color:#8b8b8b;font-size:12px">⏳ Generating…</div>
-          <img id="cgptImg" src="" style="display:none;width:100%;border-radius:6px;margin-top:8px">
-          <div id="cgptErr" style="color:#f85149;font-size:11px;margin-top:6px;display:none"></div>
-        </div>
-        <div id="compareRight" style="background:#161b22;border-radius:8px;padding:16px;border:1px solid #30363d">
-          <div style="color:#4285f4;font-weight:700;margin-bottom:8px">Gemini (Gemini Advanced)</div>
-          <div id="gemStatus" style="color:#8b8b8b;font-size:12px">⏳ Generating…</div>
-          <img id="gemImg" src="" style="display:none;width:100%;border-radius:6px;margin-top:8px">
-          <div id="gemErr" style="color:#f85149;font-size:11px;margin-top:6px;display:none"></div>
-        </div>
-      </div>
-      <div style="margin-top:12px;color:#8b8b8b;font-size:11px">
-        Both images used identical prompt, images, and background. Judge quality, design preservation, and background integration.
-      </div>
+      <button class="btn btn-ghost btn-sm" onclick="resetDuplicateDB()">
+        <i class="fa-solid fa-lock" style="color:var(--gold)"></i> Reset Duplicates
+      </button>
     </div>
   </div>
 
+  <!-- GALLERY -->
+  <div class="panel" id="gallerySection" style="display:none">
+    <div class="section-hdr">
+      <div class="section-title"><i class="fa-solid fa-images"></i> Results</div>
+      <span id="galleryCount" style="font-size:12px;color:var(--text-muted)"></span>
+    </div>
+    <div id="resultsGallery" class="results-gallery"></div>
+  </div>
+
+  <!-- ERROR LOG -->
+  <div id="errorLog" class="error-log">
+    <div class="error-log-hdr">
+      <span><i class="fa-solid fa-triangle-exclamation"></i> Errors</span>
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('errorLog').style.display='none'" style="padding:2px 8px;font-size:11px">dismiss</button>
+    </div>
+    <div id="errorLogBody"></div>
+  </div>
+
+</main>
 </div>
 
 <script>
-let _pairs   = [];
-let _staged  = [];
-let _selBg   = "";
-let _polling = null;
+let _pairs = [], _staged = [], _selBg = '', _polling = null;
+let _previewOn = false, _previewTimer = null;
 
-// ── Step 1: Load ──────────────────────────────────────────────────────────────
-
-async function loadFromInput() {
-  const r = await fetch('/api/load').then(x => x.json());
-  _pairs = r.pairs || [];
-  showPairs(_pairs, 'pairsGrid', 'input');
-  document.getElementById('loadInfo').textContent =
-    `${r.count} photos · ${_pairs.length} pair(s)`;
-}
-
-async function uploadFiles(files) {
-  if (!files.length) return;
-  document.getElementById('loadInfo').textContent = 'Uploading…';
-  const fd = new FormData();
-  for (const f of files) fd.append('files', f);
-  await fetch('/api/upload', {method:'POST', body:fd});
-  await loadFromInput();
-}
-
-function showPairs(pairs, gridId, folder) {
-  const g = document.getElementById(gridId);
-  g.innerHTML = '';
-  pairs.forEach(p => {
-    const d = document.createElement('div');
-    d.className = 'pair-thumb';
-    const src = p.jewel ? `/img/${folder}/${p.jewel}` : '';
-    d.innerHTML = src
-      ? `<img src="${src}" onerror="this.style.display='none'">`
-      : '';
-    d.innerHTML += `<div>${p.jewel || '—'}</div><div style="color:#555">${p.tag || 'no tag'}</div>`;
-    g.appendChild(d);
-  });
-  g.style.display = pairs.length ? 'grid' : 'none';
-}
-
-// ── Step 2: Category ──────────────────────────────────────────────────────────
-
-function onCatChange() {
-  const v = document.getElementById('catSelect').value;
-  document.getElementById('catConfirm').textContent = v ? '✓ ' + v.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()) : '';
-  autoSelectBg(v);
-}
-
-// ── Step 3: Background ────────────────────────────────────────────────────────
-
-(async function loadBgs() {
+// ── INIT ──────────────────────────────────────────────────────────────────────
+async function init() {
   const r = await fetch('/api/backgrounds').then(x => x.json());
   const grid = document.getElementById('bgGrid');
   grid.innerHTML = '';
   (r.backgrounds || []).forEach(bg => {
     const d = document.createElement('div');
-    d.className = 'bg-thumb';
+    d.className = 'bg-tile';
     d.dataset.bg = bg;
-    d.innerHTML = `<img src="/img/backgrounds/${bg}" onerror="this.style.display='none'">
-                   <div class="bg-label">${bg.replace('.png','')}</div>`;
-    d.onclick = () => selectBg(bg);
+    d.onclick = () => selectBg(bg, d);
+    d.innerHTML = `<img src="/img/bg/${bg}" onerror="this.style.display='none'">
+                   <div class="tile-name">${bg.replace(/\.[^.]+$/,'')}</div>`;
     grid.appendChild(d);
   });
-})();
+}
+init();
 
-function selectBg(bg) {
+function selectBg(bg, el) {
   _selBg = bg;
-  document.querySelectorAll('.bg-thumb').forEach(d => {
-    d.classList.toggle('selected', d.dataset.bg === bg);
-  });
-  document.getElementById('bgConfirm').textContent = '✓ Background: ' + bg.replace('.png','');
+  document.querySelectorAll('.bg-tile').forEach(t => t.classList.remove('selected'));
+  el.classList.add('selected');
+  document.getElementById('bgConfirm').textContent = bg;
 }
 
-function autoSelectBg(cat) {
-  if (!cat) return;
-  const name = cat + '.png';
-  const el = document.querySelector(`.bg-thumb[data-bg="${name}"]`);
-  if (el) selectBg(name);
+// ── LOAD ──────────────────────────────────────────────────────────────────────
+async function loadFromInput() {
+  const r = await fetch('/api/load').then(x => x.json());
+  _pairs = r.pairs || [];
+  document.getElementById('loadInfo').textContent = `${r.count} files · ${_pairs.length} pairs`;
+  document.getElementById('statQueue').textContent = _pairs.length;
+  showPairs(_pairs, 'pairsGrid', 'input');
 }
 
-// ── Step 4: Stage ─────────────────────────────────────────────────────────────
+async function uploadFiles(files) {
+  const fd = new FormData();
+  Array.from(files).forEach(f => fd.append('files', f));
+  const r = await fetch('/api/upload', {method:'POST', body:fd}).then(x => x.json());
+  _pairs = r.pairs || [];
+  document.getElementById('loadInfo').textContent = `${r.count} files · ${_pairs.length} pairs`;
+  document.getElementById('statQueue').textContent = _pairs.length;
+  showPairs(_pairs, 'pairsGrid', 'input');
+}
+
+function showPairs(pairs, gridId, folder) {
+  const g = document.getElementById(gridId);
+  if (!pairs.length) { g.style.display='none'; return; }
+  g.style.display = 'grid';
+  g.innerHTML = pairs.map(p => `
+    <div class="pair-card">
+      <img src="/img/${folder}/${p.jewel}" onerror="this.src='/img/placeholder.png'">
+      <div class="pair-num">#${p.pair}</div>
+      <div class="pair-name">${(p.jewel||'').replace(/_jewel.*/i,'').substring(0,14)}</div>
+    </div>`).join('');
+}
+
+function onCatChange() {
+  const v = document.getElementById('catSelect').value;
+  document.getElementById('catConfirm').textContent = v ? `✓ ${v.replace('_',' ')}` : '';
+  // Auto-select matching background
+  const tile = document.querySelector(`.bg-tile[data-bg*="${v}"]`) ||
+               document.querySelector('.bg-tile');
+  if (tile) tile.click();
+}
 
 async function stageFiles() {
   const r = await fetch('/api/stage', {method:'POST'}).then(x => x.json());
   _staged = r.staged || [];
-  document.getElementById('stageInfo').textContent =
-    `Staged ${_staged.length} pair(s) to processing\\`;
+  document.getElementById('stageInfo').textContent = `${_staged.length} pairs staged`;
+  document.getElementById('statQueue').textContent = _staged.length;
   showPairs(_staged, 'stagedGrid', 'processing');
   document.getElementById('stagedGrid').style.display = _staged.length ? 'grid' : 'none';
-  // Clear loaded pairs display
-  document.getElementById('pairsGrid').style.display = 'none';
-  document.getElementById('loadInfo').textContent = '';
 }
 
-// ── Step 5: Process ───────────────────────────────────────────────────────────
-
-function _setBtns(disabled) {
-  ['runBtn','geminiBtn','parallelBtn','codexBtn'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.disabled = disabled;
-  });
-  document.getElementById('stopBtn').style.display = disabled ? 'block' : 'none';
-}
-
-function _startProgress(label) {
-  document.getElementById('progressWrap').style.display   = 'block';
-  document.getElementById('progressStatus').style.display = 'flex';
-  document.getElementById('progressFill').style.width     = '0%';
-  document.getElementById('statusCur').textContent        = label;
-  document.getElementById('statusCount').textContent      = '';
-  document.getElementById('statusEta').textContent        = '';
-  document.getElementById('statusElapsed').textContent    = '';
-  document.getElementById('statusSlots').textContent      = '';
-  document.getElementById('resultsGrid').style.display    = 'none';
-}
-
+// ── BG UPLOAD ─────────────────────────────────────────────────────────────────
 async function uploadCustomBg(input) {
-  const file = input.files[0];
-  if (!file) return;
-  const fd = new FormData();
-  fd.append('file', file);
-  const r = await fetch('/api/upload_bg', {method:'POST', body: fd});
-  const j = await r.json();
-  if (j.ok) {
-    _selBg = j.filename;
-    document.getElementById('bgBrowseInfo').textContent = '✓ ' + j.filename;
-    document.getElementById('bgConfirm').textContent = 'Background: ' + j.filename;
-    // Deselect any grid tile
+  const file = input.files[0]; if (!file) return;
+  const fd = new FormData(); fd.append('file', file);
+  const r = await fetch('/api/upload_bg', {method:'POST', body:fd}).then(x => x.json());
+  if (r.ok) {
+    _selBg = r.filename;
+    document.getElementById('bgBrowseInfo').textContent = '✓ ' + r.filename;
+    document.getElementById('bgConfirm').textContent = r.filename;
     document.querySelectorAll('.bg-tile').forEach(t => t.classList.remove('selected'));
-  } else {
-    document.getElementById('bgBrowseInfo').textContent = '❌ Upload failed';
   }
 }
 
-async function rejectResult(pairNum, sku) {
-  if (!confirm(`Reject pair ${pairNum} (${sku || 'unknown'}) and requeue for reprocessing?`)) return;
-  const r = await fetch('/api/reject', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({pair: pairNum, sku})
+// ── ENGINE BUTTONS ────────────────────────────────────────────────────────────
+function _cat() {
+  const c = document.getElementById('catSelect').value;
+  if (!c) { alert('Select ornament type first.'); return null; }
+  return c;
+}
+function _setBtns(disabled) {
+  ['runBtn','geminiBtn','codexBtn','parallelBtn'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.disabled = disabled;
   });
-  const j = await r.json();
-  if (j.ok) {
-    alert(`✓ Pair ${pairNum} queued for reprocessing`);
-  } else {
-    alert('❌ ' + (j.error || 'Failed'));
-  }
+  document.getElementById('stopBtn').style.display = disabled ? 'flex' : 'none';
+  document.getElementById('progressSection').style.display = disabled ? 'block' : 'block';
 }
-
-let _previewOn = false;
-let _previewTimer = null;
-let _clickMode = false;
-
-function togglePreview() {
-  _previewOn = !_previewOn;
-  document.getElementById('previewSection').style.display = _previewOn ? 'block' : 'none';
-  document.getElementById('previewToggle').textContent = _previewOn ? '👁 Hide Chrome Preview' : '👁 Show Chrome Preview';
-  if (_previewOn) {
-    _refreshPreviews();
-    _previewTimer = setInterval(_refreshPreviews, 1000);
-  } else {
-    clearInterval(_previewTimer);
-  }
-}
-
-async function _refreshPreviews() {
-  for (const port of [9222, 9223]) {
-    const img = document.getElementById(`preview${port}`);
-    if (img) img.src = `/api/chrome_preview?port=${port}&t=${Date.now()}`;
-  }
-}
-
-async function handlePreviewClick(e, port) {
-  const img = e.target;
-  const rect = img.getBoundingClientRect();
-  // Scale click coords from displayed size to actual Chrome window size (1280x900)
-  const scaleX = 1280 / rect.width;
-  const scaleY = 900  / rect.height;
-  const x = Math.round((e.clientX - rect.left) * scaleX);
-  const y = Math.round((e.clientY - rect.top)  * scaleY);
-  const r = await fetch('/api/chrome_click', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({port, x, y})
-  });
-  const j = await r.json();
-  console.log(`Clicked (${x},${y}) on port ${port}:`, j);
-  // Refresh preview immediately after click
-  setTimeout(_refreshPreviews, 300);
-}
-
-async function resetDuplicateDB() {
-  const pwd = prompt('Enter admin password to clear duplicate history:');
-  if (!pwd) return;
-  const r = await fetch('/api/admin/reset_db', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({password: pwd})
-  });
-  const j = await r.json();
-  if (j.ok) {
-    alert('✅ Duplicate history cleared. All images will be treated as new.');
-  } else {
-    alert('❌ ' + (j.error || 'Failed'));
-  }
-}
-
-async function stopRun() {
-  await fetch('/api/stop', {method:'POST'});
-  document.getElementById('statusCur').textContent = '⏹ Stopping…';
+function _startProgress(label) {
+  document.getElementById('progressSection').style.display = 'block';
+  document.getElementById('progressFill').style.width = '0%';
+  document.getElementById('statusCur').textContent = label;
+  ['statusCount','statusEta','statusElapsed'].forEach(id => document.getElementById(id).textContent = '');
+  document.getElementById('gallerySection').style.display = 'none';
 }
 
 async function runChatGPT() {
-  const cat = document.getElementById('catSelect').value;
-  if (!cat) { alert('Select ornament type first.'); return; }
+  const cat = _cat(); if (!cat) return;
   const pairs = _staged.length ? _staged : _pairs;
   if (!pairs.length) { alert('No pairs loaded.'); return; }
-  _setBtns(true);
-  _startProgress('Starting ChatGPT…');
-  await fetch('/api/chatgpt_run', {method:'POST',
-    headers:{'Content-Type':'application/json'},
+  _setBtns(true); _startProgress('Starting ChatGPT…');
+  await fetch('/api/chatgpt_run', {method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({pairs, category: cat, bg: _selBg})});
   startPolling();
 }
-
 async function runGemini() {
-  const cat = document.getElementById('catSelect').value;
-  if (!cat) { alert('Select ornament type first.'); return; }
-  _setBtns(true);
-  _startProgress('Starting Gemini…');
-  await fetch('/api/gemini_run', {method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({category: cat, bg: _selBg || ''})});
+  const cat = _cat(); if (!cat) return;
+  _setBtns(true); _startProgress('Starting Gemini…');
+  await fetch('/api/gemini_run', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({category: cat, bg: _selBg})});
   startPolling();
 }
-
 async function runCodex() {
-  const cat = document.getElementById('catSelect').value;
-  if (!cat) { alert('Select ornament type first.'); return; }
-  _setBtns(true);
-  _startProgress('Starting Codex engine…');
-  await fetch('/api/codex_run', {method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({category: cat, bg: _selBg || ''})});
+  const cat = _cat(); if (!cat) return;
+  _setBtns(true); _startProgress('Starting Codex — 5 parallel workers…');
+  await fetch('/api/codex_run', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({category: cat, bg: _selBg})});
   startPolling();
 }
-
 async function runParallel() {
-  const cat = document.getElementById('catSelect').value;
-  if (!cat) { alert('Select ornament type first.'); return; }
-  _setBtns(true);
-  _startProgress('Starting ChatGPT + Gemini…');
-  await fetch('/api/parallel_run', {method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({category: cat, bg: _selBg || ''})});
+  const cat = _cat(); if (!cat) return;
+  _setBtns(true); _startProgress('Starting ChatGPT + Gemini…');
+  await fetch('/api/parallel_run', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({category: cat, bg: _selBg})});
   startPolling();
 }
+async function stopRun() {
+  await fetch('/api/stop', {method:'POST'});
+  document.getElementById('statusCur').textContent = '⏹ Stopped';
+}
 
+// ── POLLING ───────────────────────────────────────────────────────────────────
 function startPolling() {
   if (_polling) clearInterval(_polling);
   _polling = setInterval(pollProgress, 1500);
@@ -649,148 +784,189 @@ async function pollProgress() {
   try { j = await fetch('/api/chatgpt_progress').then(x => x.json()); }
   catch { return; }
 
-  const total = j.total || 0;
-  const done  = j.done  || 0;
-  const pct   = total > 0 ? Math.round((done / total) * 100) : 0;
+  const total = j.total || 0, done = j.done || 0;
+  const pct = total > 0 ? Math.round(done/total*100) : 0;
 
   document.getElementById('progressFill').style.width = pct + '%';
 
-  const cgptActive   = j.current && j.current !== 'done';
-  const geminiActive = j.gemini_current && j.gemini_current !== 'idle' && j.gemini_current !== 'done';
-  const curText = cgptActive && geminiActive
-    ? `ChatGPT: ${j.current} | Gemini: ${j.gemini_current}`
-    : geminiActive ? `Gemini: ${j.gemini_current}`
-    : (j.current || '');
+  const cgActive = j.current && j.current !== 'done';
+  const gmActive = j.gemini_current && j.gemini_current !== 'idle' && j.gemini_current !== 'done';
+  document.getElementById('statusCur').textContent =
+    cgActive && gmActive ? `ChatGPT: ${j.current} | Gemini: ${j.gemini_current}` :
+    gmActive ? `Gemini: ${j.gemini_current}` : (j.current || '');
 
-  document.getElementById('statusCur').textContent      = curText;
-  document.getElementById('statusCount').textContent    = total > 0 ? `${done}/${total} · ${pct}%` : '';
-  document.getElementById('statusEta').textContent      = j.eta != null ? `ETA ${fmt(j.eta)}` : '';
-  document.getElementById('statusElapsed').textContent  = j.elapsed ? `${fmt(j.elapsed)} elapsed` : '';
-  if (j.slots) document.getElementById('statusSlots').textContent = j.slots;
+  document.getElementById('statusCount').textContent = total > 0 ? `${done}/${total} · ${pct}%` : '';
+  document.getElementById('statusEta').textContent   = j.eta != null ? `ETA ${fmt(j.eta)}` : '';
+  document.getElementById('statusElapsed').textContent = j.elapsed ? fmt(j.elapsed) + ' elapsed' : '';
+
+  // Stats bar
+  document.getElementById('statDone').textContent = done;
+  if (j.eta != null) document.getElementById('statEta').textContent = fmt(j.eta);
+
+  if (j.slots) {
+    const sEl = document.getElementById('statusSlots');
+    sEl.textContent = j.slots;
+    sEl.style.display = 'inline';
+    const m = j.slots.match(/(\d+)\/50/);
+    if (m) document.getElementById('statSlots').textContent = m[1];
+    document.getElementById('slotsPill').style.display = 'flex';
+    document.getElementById('slotsLabel').textContent = j.slots.split('—')[0].trim();
+  }
 
   if (j.results && j.results.length) {
-    showResults(j.results, done, total);
-    // Show errors in error log
-    const errs = j.results.filter(r => r.error && !r.skipped);
-    if (errs.length) {
-      const log = document.getElementById('errorLog');
-      const body = document.getElementById('errorLogBody');
-      log.style.display = 'block';
-      body.innerHTML = errs.map(r =>
-        `<div>Pair ${r.pair} [${r.sku||'?'}]: ${r.error}</div>`
-      ).join('');
-    }
+    showResults(j.results);
+    const count = j.results.filter(r => r.output).length;
+    document.getElementById('sidebarCount').textContent = count;
+    document.getElementById('sidebarCount').style.display = count ? '' : 'none';
+    document.getElementById('galleryCount').textContent = `${count} saved`;
+  }
+
+  // Error log
+  const errs = (j.results||[]).filter(r => r.error && !r.skipped);
+  if (errs.length) {
+    const el = document.getElementById('errorLog');
+    el.style.display = 'block';
+    document.getElementById('errorLogBody').innerHTML =
+      errs.map(r => `<div>Pair ${r.pair} [${r.sku||'?'}]: ${r.error}</div>`).join('');
   }
 
   if (!j.running) {
-    clearInterval(_polling);
-    _polling = null;
+    clearInterval(_polling); _polling = null;
     _setBtns(false);
     document.getElementById('progressFill').style.width = '100%';
+    if (done > 0) document.getElementById('statEta').textContent = '—';
   }
-}
-
-async function runCompare() {
-  const cat = document.getElementById('catSelect').value;
-  if (!cat) { alert('Select ornament type first.'); return; }
-  _setBtns(true);
-  _startProgress('Running comparison test…');
-  document.getElementById('comparePanel').style.display = 'block';
-  ['cgptStatus','gemStatus'].forEach(id =>
-    document.getElementById(id).textContent = '⏳ Generating…');
-  ['cgptImg','gemImg','cgptErr','gemErr'].forEach(id =>
-    document.getElementById(id).style.display = 'none');
-  await fetch('/api/compare_test', {method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({category: cat, bg: _selBg || ''})});
-  const poll = setInterval(async () => {
-    const j = await fetch('/api/compare_progress').then(r => r.json());
-    if (j.chatgpt_done) {
-      document.getElementById('cgptStatus').textContent = j.chatgpt_output ? '✅ Done' : '❌ Failed';
-      if (j.chatgpt_output) {
-        const img = document.getElementById('cgptImg');
-        img.src = '/img/output/' + j.chatgpt_output + '?t=' + Date.now();
-        img.style.display = 'block';
-      } else {
-        document.getElementById('cgptErr').textContent = j.chatgpt_error || '';
-        document.getElementById('cgptErr').style.display = 'block';
-      }
-    }
-    if (j.gemini_done) {
-      document.getElementById('gemStatus').textContent = j.gemini_output ? '✅ Done' : '❌ Failed';
-      if (j.gemini_output) {
-        const img = document.getElementById('gemImg');
-        img.src = '/img/output/' + j.gemini_output + '?t=' + Date.now();
-        img.style.display = 'block';
-      } else {
-        document.getElementById('gemErr').textContent = j.gemini_error || '';
-        document.getElementById('gemErr').style.display = 'block';
-      }
-    }
-    if (!j.running) { clearInterval(poll); _setBtns(false); }
-  }, 2000);
 }
 
 function fmt(s) {
   if (s == null) return '—';
-  const m = Math.floor(s / 60), sec = s % 60;
+  const m = Math.floor(s/60), sec = Math.round(s%60);
   return m > 0 ? `${m}m ${sec}s` : `${sec}s`;
 }
 
-function showResults(results, done, total) {
-  const g = document.getElementById('resultsGrid');
-  g.style.display = 'grid';
-  g.innerHTML = '';
-  results.forEach(r => {
-    const d = document.createElement('div');
-    d.className = 'result-card';
+// ── GALLERY ───────────────────────────────────────────────────────────────────
+function showResults(results) {
+  const gallery = document.getElementById('resultsGallery');
+  document.getElementById('gallerySection').style.display = 'block';
+  const sorted = [...results].sort((a,b) => (a.pair||0)-(b.pair||0));
+
+  gallery.innerHTML = sorted.map(r => {
+    const engine = r.engine === 'codex' ? '<span class="badge-codex result-badge">Codex</span>' :
+                   r.engine === 'gemini' || r.engine === 'gemini_fallback' ? '<span class="badge-gem result-badge">Gemini</span>' : '';
+
+    if (r.skipped) return `
+      <div class="result-card">
+        <div class="result-img-placeholder"><i class="fa-solid fa-forward"></i></div>
+        <div class="result-body">
+          <div class="result-sku">${r.sku||'—'}</div>
+          <div class="result-meta"><span class="result-badge badge-skip">Skipped</span>${engine}</div>
+        </div>
+      </div>`;
 
     if (r.output && r.duplicate) {
-      const typeColors = {
-        exact_duplicate:      '#f85149',
-        same_tag_diff_design: '#f0a500',
-        same_design_diff_tag: '#a371f7',
-      };
-      const typeLabels = {
-        exact_duplicate:      '⛔ EXACT DUPLICATE',
-        same_tag_diff_design: '⚠ SAME TAG — DIFFERENT DESIGN',
-        same_design_diff_tag: '⚠ SAME DESIGN — DIFFERENT TAG',
-      };
-      const col = typeColors[r.duplicate_type] || '#f0a500';
-      const lbl = typeLabels[r.duplicate_type] || '⚠ FLAGGED';
-      // Show each finding separately
-      const findingHtml = (r.findings || []).map(f =>
-        `<div style="color:#8b8b8b;font-size:10px;margin-top:3px;word-break:break-all">${f.message}</div>`
-      ).join('');
-      d.style.border = `2px solid ${col}`;
-      d.innerHTML = `<img src="/img/output/${r.output}" onerror="this.style.display='none'">
-                     <div class="sku">${r.sku || '—'}</div>
-                     <div style="color:${col};font-size:11px;font-weight:700">${lbl}</div>
-                     ${findingHtml}`;
-    } else if (r.output) {
-      const engineBadge = r.engine === 'gemini_fallback'
-        ? '<div style="color:#4285f4;font-size:10px">via Gemini fallback</div>'
-        : r.engine === 'gemini'
-        ? '<div style="color:#4285f4;font-size:10px">Gemini</div>'
-        : '';
-      d.innerHTML = `<img src="/img/output/${r.output}" onerror="this.style.display='none'">
-                     <div class="sku">${r.sku || '—'}</div>
-                     <div class="ok">✓ saved</div>${engineBadge}
-                     <button onclick="rejectResult(${r.pair},'${r.sku||''}')"
-                       style="margin-top:4px;width:100%;padding:3px;background:none;
-                              border:1px solid #da3633;color:#da3633;border-radius:4px;
-                              font-size:10px;cursor:pointer">✗ Reject &amp; Reprocess</button>`;
-    } else if (r.skipped) {
-      d.style.opacity = '0.5';
-      d.innerHTML = `<div class="sku">${r.sku || '—'}</div>
-                     <div style="color:#8b8b8b">⏭ skipped (resumed)</div>`;
-    } else {
-      d.innerHTML = `<div class="sku">Pair ${r.pair}</div>
-                     <div class="err">${r.error || 'failed'}</div>`;
+      const typeLabel = r.duplicate_type === 'exact_duplicate' ? 'Duplicate' :
+                       r.duplicate_type === 'same_tag_diff_design' ? 'Tag reused' : 'Design match';
+      return `
+        <div class="result-card flagged">
+          <img class="result-img" src="/img/output/${r.output}" onerror="this.style.display='none'">
+          <div class="result-body">
+            <div class="result-sku">${r.sku||'—'}</div>
+            <div class="result-meta"><span class="result-badge badge-flag">${typeLabel}</span>${engine}</div>
+          </div>
+          <div class="result-actions">
+            <button class="btn btn-danger" onclick="rejectResult(${r.pair},'${r.sku||''}')">
+              <i class="fa-solid fa-xmark"></i> Reject
+            </button>
+          </div>
+        </div>`;
     }
-    g.appendChild(d);
-  });
+
+    if (r.output) return `
+      <div class="result-card">
+        <img class="result-img" src="/img/output/${r.output}?t=${Date.now()}" onerror="this.style.display='none'">
+        <div class="result-body">
+          <div class="result-sku">${r.sku||'—'}</div>
+          <div class="result-meta"><span class="result-badge badge-ok">Saved</span>${engine}</div>
+        </div>
+        <div class="result-actions">
+          <button class="btn btn-danger btn-sm" onclick="rejectResult(${r.pair},'${r.sku||''}')">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+      </div>`;
+
+    return `
+      <div class="result-card error-state">
+        <div class="result-img-placeholder"><i class="fa-solid fa-triangle-exclamation"></i></div>
+        <div class="result-body">
+          <div class="result-sku">${r.sku||`Pair ${r.pair}`}</div>
+          <div class="result-meta"><span class="result-badge badge-err">Failed</span>${engine}</div>
+        </div>
+      </div>`;
+  }).join('');
 }
+
+// ── CHROME PREVIEW ────────────────────────────────────────────────────────────
+function togglePreview() {
+  _previewOn = !_previewOn;
+  document.getElementById('previewSection').style.display = _previewOn ? 'block' : 'none';
+  document.getElementById('previewToggle').innerHTML = _previewOn ?
+    '<i class="fa-regular fa-eye-slash"></i> Preview' :
+    '<i class="fa-regular fa-eye"></i> Preview';
+  if (_previewOn) {
+    _refreshPreviews();
+    _previewTimer = setInterval(_refreshPreviews, 1000);
+  } else {
+    clearInterval(_previewTimer);
+  }
+}
+async function _refreshPreviews() {
+  for (const port of [9222, 9223]) {
+    const img = document.getElementById(`preview${port}`);
+    if (img) img.src = `/api/chrome_preview?port=${port}&t=${Date.now()}`;
+  }
+}
+async function handlePreviewClick(e, port) {
+  const img = e.target;
+  const rect = img.getBoundingClientRect();
+  const x = Math.round((e.clientX - rect.left) * 1280 / rect.width);
+  const y = Math.round((e.clientY - rect.top)  * 900  / rect.height);
+  await fetch('/api/chrome_click', {method:'POST',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify({port,x,y})});
+  setTimeout(_refreshPreviews, 300);
+}
+
+// ── MISC ──────────────────────────────────────────────────────────────────────
+async function newChat() {
+  await fetch('/api/new_chat', {method:'POST'});
+}
+async function rejectResult(pairNum, sku) {
+  if (!confirm(`Reject pair ${pairNum} (${sku}) and requeue?`)) return;
+  const r = await fetch('/api/reject', {method:'POST',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify({pair:pairNum,sku})});
+  const j = await r.json();
+  if (j.ok) alert(`✓ Pair ${pairNum} queued for reprocessing`);
+}
+async function resetDuplicateDB() {
+  const pwd = prompt('Admin password:');
+  if (!pwd) return;
+  const r = await fetch('/api/admin/reset_db', {method:'POST',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify({password:pwd})});
+  const j = await r.json();
+  alert(j.ok ? '✅ Duplicate history cleared.' : '❌ ' + j.error);
+}
+async function uploadCustomBg(input) {
+  const file = input.files[0]; if (!file) return;
+  const fd = new FormData(); fd.append('file', file);
+  const r = await fetch('/api/upload_bg', {method:'POST', body:fd}).then(x => x.json());
+  if (r.ok) {
+    _selBg = r.filename;
+    document.getElementById('bgBrowseInfo').textContent = '✓ ' + r.filename;
+    document.getElementById('bgConfirm').textContent = r.filename;
+    document.querySelectorAll('.bg-tile').forEach(t => t.classList.remove('selected'));
+  }
+}
+async function runCompare() {}
 </script>
 </body>
 </html>

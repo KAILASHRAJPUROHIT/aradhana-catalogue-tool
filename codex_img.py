@@ -128,7 +128,7 @@ def generate(jewel_path: str, tag_path: str, bg_path: str,
         f"LABEL: <exact item code from tag in image 2>\n"
         f"Example: LABEL: TP22/30\n"
         f"Do NOT write 'LABEL:' anywhere else in your reply."
-    )
+      )  # end of studio prompt
 
     payload = {
         "model": "gpt-5.5",

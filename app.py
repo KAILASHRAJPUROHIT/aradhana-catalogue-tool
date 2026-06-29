@@ -84,6 +84,7 @@ def img(where, name):
         "processing":  PROCESSING,
         "output":      OUTPUT,
         "backgrounds": BACKGROUNDS_DIR,
+        "bg":          BACKGROUNDS_DIR,   # alias used by UI
     }.get(where)
     if not folder:
         return "Not found", 404

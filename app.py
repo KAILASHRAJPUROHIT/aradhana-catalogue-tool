@@ -961,9 +961,10 @@ def api_chatgpt_progress():
 def api_codex_run():
     if CGPT_JOB["running"]:
         return jsonify({"error": "Already running"}), 400
-    data     = request.json or {}
-    category = data.get("category", "earrings")
-    bg_name  = data.get("bg", "")
+    data      = request.json or {}
+    category  = data.get("category", "earrings")
+    bg_name   = data.get("bg", "")
+    model_cfg = data.get("model", {"enabled": False})
     pairs    = _derive_pairs_from_disk()
 
     if bg_name and not bg_name.lower().endswith((".png",".jpg",".jpeg",".webp")):

@@ -403,13 +403,13 @@ def generate_one(spec, female_ref_path=None):
 # ── MAIN ──────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    # Clear old library first
-    import shutil
+    # Clear old generated images — preserve reference photos
+    KEEP = {"pose1_front.jpg", "pose2_gesture.jpg", "pose3_45deg.jpg", "reference.jpg"}
     for zone_dir in (FEMALE_DIR, MALE_DIR, KIDS_DIR):
         for f in os.listdir(zone_dir):
-            if f.endswith(".jpg"):
+            if f.endswith(".jpg") and f not in KEEP:
                 os.remove(os.path.join(zone_dir, f))
-    print("Old library cleared.")
+    print("Old library cleared (reference photos preserved).")
 
     total = len(LIBRARY)
     print(f"{'='*60}")

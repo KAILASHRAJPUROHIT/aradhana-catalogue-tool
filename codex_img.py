@@ -225,7 +225,7 @@ def generate(jewel_path: str, tag_path: str, bg_path: str,
     # Save output
     import re as _re
     safe = _re.sub(r'[/\\:*?"<>|]', '_', label or "studio")
-    out_path = os.path.join(OUTPUT, f"{safe}_codex.png")
+    out_path = os.path.join(OUTPUT, f"{safe}.png")
     os.makedirs(OUTPUT, exist_ok=True)
     with open(out_path, "wb") as f:
         f.write(base64.b64decode(result_b64))

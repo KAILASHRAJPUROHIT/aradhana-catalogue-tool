@@ -32,13 +32,14 @@ def _load_token() -> str:
     return token
 
 
-def _encode_image(path: str, max_edge: int = 1024) -> tuple[str, str]:
+def _encode_image(path: str, max_edge: int = 768) -> tuple[str, str]:
+    """768px is sufficient for ChatGPT's editing model — 40% smaller request body."""
     from PIL import Image
     import io
     img = Image.open(path).convert("RGB")
     img.thumbnail((max_edge, max_edge))
     buf = io.BytesIO()
-    img.save(buf, "JPEG", quality=88)
+    img.save(buf, "JPEG", quality=85)
     return base64.b64encode(buf.getvalue()).decode(), "image/jpeg"
 
 

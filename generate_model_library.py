@@ -56,15 +56,16 @@ MALE_BASE = (
 # ── KIDS MODEL ────────────────────────────────────────────────────────────────
 
 KIDS_GIRL_BASE = (
-    "An adorable South Indian girl, 6-8 years old, bright natural smile, "
-    "dressed in a beautiful silk pavadai (skirt-top) in rich colours — gold, red, or green. "
-    "Hair neatly done with flowers, light festive styling, genuinely joyful expression."
+    "An adorable Indian girl, 6-8 years old, fair complexion, beautiful features, "
+    "bright natural smile, dressed in a gorgeous festive lehenga or silk frock "
+    "in rich colours — gold, pink, or red. "
+    "Hair neatly styled with accessories, light festive look, genuinely joyful and charming."
 )
 
 KIDS_BOY_BASE = (
-    "An adorable South Indian boy, 6-8 years old, bright natural smile, "
-    "dressed in a beautiful silk kurta in deep blue or maroon. "
-    "Well groomed, cheerful and natural."
+    "An adorable Indian boy, 6-8 years old, fair complexion, handsome features, "
+    "bright natural smile, dressed in a smart kurta or sherwani in deep blue, "
+    "maroon, or ivory. Well groomed, cheerful and naturally confident."
 )
 
 # ── STUDIO QUALITY ────────────────────────────────────────────────────────────

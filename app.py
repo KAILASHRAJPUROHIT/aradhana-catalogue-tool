@@ -1032,7 +1032,7 @@ def api_codex_run():
 
             label    = r.get("label") or f"AJ-{s['pair']:03d}"
             safe     = re.sub(r'[/\\:*?"<>|]', '_', label)
-            out_path = os.path.join(out_dir, f"{safe}_codex.png")
+            out_path = os.path.join(out_dir, f"{safe}.png")
             entry    = {"pair": s["pair"], "sku": label, "engine": "codex"}
 
             if r.get("output") and os.path.exists(r["output"]):

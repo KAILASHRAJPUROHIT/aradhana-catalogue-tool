@@ -46,10 +46,11 @@ FEMALE_BASE = (
 # ── MALE MODEL ────────────────────────────────────────────────────────────────
 
 MALE_BASE = (
-    "A handsome South Indian man, early 30s, sharp features, well-groomed. "
-    "Contemporary variant: premium bandhgala suit or crisp white shirt with dark trousers. "
-    "Traditional variant: rich silk kurta in deep jewel tones. "
-    "Confident, refined, aspirational — high-end catalogue model look."
+    "IMPORTANT: Use the man in the reference photo (image 1) as the model. "
+    "Maintain his exact face, skin tone, and features. "
+    "Style him in premium outfits — bandhgala suit, crisp linen shirt, or rich silk kurta "
+    "depending on the shot context. "
+    "Well-groomed, confident, aspirational — high-end jewellery catalogue model."
 )
 
 # ── KIDS MODEL ────────────────────────────────────────────────────────────────

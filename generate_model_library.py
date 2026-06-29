@@ -1,11 +1,14 @@
 """
-Aradhana Jewellers — Model Library Generator
-Generates all ~84 body-zone reference images ONCE.
-After this, every product composites jewellery onto these pre-made model photos.
+Aradhana Jewellers — Model Library Generator (v2)
+Philosophy:
+  - Female model = same woman as reference photos, but in EDITORIAL/LUXURY styling
+    (not store uniform — beautiful silk sarees, lehengas, great makeup, polished skin)
+  - 3 variants per pose = SAME pose, 3 DIFFERENT STUDIO BACKGROUNDS
+  - Result: 3 interchangeable versions of each pose for creative variety
 
-Run once: python generate_model_library.py
+Run: python generate_model_library.py
 """
-import sys, os, json, time, base64
+import sys, os, json, time, base64, io
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 BASE       = r"C:\Users\kaila\Desktop\JewelleryCatalogTool"
@@ -17,306 +20,325 @@ KIDS_DIR   = os.path.join(MODELS_DIR, "kids")
 for d in (FEMALE_DIR, MALE_DIR, KIDS_DIR):
     os.makedirs(d, exist_ok=True)
 
-# ── Consistent male model description ─────────────────────────────────────────
-MALE_CONTEMPORARY = (
-    "A handsome South Indian man in his early 30s, clean grooming, sharp features, "
-    "confident warm expression. Wearing a well-fitted navy blue bandhgala suit or premium kurta. "
-    "Professional, premium, catalogue-ready appearance."
+# ── 3 STUDIO BACKGROUNDS (same pose, different BG each variant) ───────────────
+
+BG = {
+    "A": "Soft ivory/cream studio backdrop, diffused side lighting, airy and bright",
+    "B": "Warm champagne gold tones, subtle warm bokeh, luxury editorial ambiance",
+    "C": "Deep charcoal grey studio, dramatic low-key lighting, jewellery glows against dark",
+}
+
+# ── FEMALE MODEL STYLING ──────────────────────────────────────────────────────
+
+FEMALE_BASE = (
+    "IMPORTANT: Use the woman in the reference photo (image 1) as the model. "
+    "Maintain her exact face, skin tone, and features. "
+    "However, DO NOT use her store uniform. Instead, style her in: "
+    "a luxurious deep jewel-tone silk saree (burgundy, emerald, or navy) OR "
+    "an elegant lehenga for bridal/festive shots. "
+    "Full editorial makeup — defined eyes, perfect skin, glossy or matte lips, "
+    "contoured and glowing complexion. Hair styled beautifully — swept up, "
+    "loose waves, or elegant bun depending on the shot. "
+    "She must look like a high-end jewellery catalogue model — polished, "
+    "sophisticated, aspirational. This is a luxury brand shoot."
 )
 
-MALE_TRADITIONAL = (
-    "A handsome South Indian man in his early 30s, traditional festive styling, "
-    "rich silk kurta in deep jewel tones (burgundy or deep green), "
-    "warm dignified expression, culturally authentic."
+# ── MALE MODEL ────────────────────────────────────────────────────────────────
+
+MALE_BASE = (
+    "A handsome South Indian man, early 30s, sharp features, well-groomed. "
+    "Contemporary variant: premium bandhgala suit or crisp white shirt with dark trousers. "
+    "Traditional variant: rich silk kurta in deep jewel tones. "
+    "Confident, refined, aspirational — high-end catalogue model look."
 )
 
-KIDS_GIRL = (
-    "An adorable South Indian girl aged 6-8, bright natural smile, "
-    "traditional silk pavadai or pattu skirt in gold and red, "
-    "hair neatly done with flowers, innocent and joyful."
+# ── KIDS MODEL ────────────────────────────────────────────────────────────────
+
+KIDS_GIRL_BASE = (
+    "An adorable South Indian girl, 6-8 years old, bright natural smile, "
+    "dressed in a beautiful silk pavadai (skirt-top) in rich colours — gold, red, or green. "
+    "Hair neatly done with flowers, light festive styling, genuinely joyful expression."
 )
 
-KIDS_BOY = (
-    "An adorable South Indian boy aged 6-8, bright natural smile, "
-    "traditional silk kurta in deep blue or maroon, "
-    "well groomed, cheerful and natural."
+KIDS_BOY_BASE = (
+    "An adorable South Indian boy, 6-8 years old, bright natural smile, "
+    "dressed in a beautiful silk kurta in deep blue or maroon. "
+    "Well groomed, cheerful and natural."
 )
 
-STUDIO_LIGHTING = (
-    "Soft diffused luxury studio lighting. Clean cream or warm white background. "
-    "Natural skin, minimal retouching, professional catalogue quality. "
-    "The model's face and hands/neck/wrist (whichever body zone is shown) are the focal point. "
-    "NO jewellery visible on the model — this is a base reference photo."
+# ── STUDIO QUALITY ────────────────────────────────────────────────────────────
+
+QUALITY = (
+    "Professional luxury editorial photography. "
+    "High-end retouching — flawless but natural skin, no over-smoothing. "
+    "The model looks real, three-dimensional, polished. "
+    "NO jewellery visible on model — this is a blank reference pose. "
+    "Square 1:1 format, ready for jewellery compositing."
 )
 
-# ── Zone generation specs ─────────────────────────────────────────────────────
-# Each entry: (output_file, gender, model_desc, shot_description, camera)
+# ── POSE LIBRARY (zone × 3 BG variants) ──────────────────────────────────────
+# Format: (output_file, model_type, pose_description, camera_spec)
+# 3 entries per pose zone — same pose, backgrounds A/B/C
 
-FEMALE_REF_NOTE = (
-    "IMPORTANT: Use image 1 as the face/appearance reference. "
-    "The model in this shot must look IDENTICAL to the woman in image 1 — "
-    "same face, same skin tone, same hair, same Aradhana store uniform (navy blue saree with red border). "
-)
+def make_entries(prefix, model_type, pose, camera):
+    return [
+        (f"{prefix}_bgA.jpg", model_type, pose, camera, "A"),
+        (f"{prefix}_bgB.jpg", model_type, pose, camera, "B"),
+        (f"{prefix}_bgC.jpg", model_type, pose, camera, "C"),
+    ]
 
-LIBRARY = [
-    # ── FEMALE BODY ZONES (3 variants each) ──────────────────────────────────
+LIBRARY = (
 
-    # Ear / Face zone
-    ("female/ear_v1.jpg",
-     "female", FEMALE_REF_NOTE,
-     "85mm portrait, model facing camera directly, ears clearly visible, "
-     "hair neatly tucked behind both ears, warm natural smile, shoulders visible",
-     "85mm lens, f/1.8, shallow depth of field on face"),
+    # ── FEMALE EAR / FACE ─────────────────────────────────────────────────────
+    *make_entries(
+        "female/ear_front", "female",
+        "Front-facing portrait from shoulders up, both ears clearly visible, "
+        "hair elegantly swept back or tucked behind ears, warm confident expression, "
+        "chin slightly lifted, neck long and graceful",
+        "85mm f/1.8, shallow DOF, face and ears sharp"
+    ),
+    *make_entries(
+        "female/ear_45", "female",
+        "45-degree portrait, model turned slightly right, right ear fully visible, "
+        "elegant profile, chin slightly raised, graceful neck curve",
+        "85mm f/2.0, 45-degree, near ear in sharp focus"
+    ),
+    *make_entries(
+        "female/ear_profile", "female",
+        "Clean side profile, model facing right, left ear fully revealed, "
+        "hair swept completely back exposing full ear and neck, "
+        "profile is sharp and elegant, chin level",
+        "100mm, pure side profile, ear as absolute focal point"
+    ),
 
-    ("female/ear_v2.jpg",
-     "female", FEMALE_REF_NOTE,
-     "45-degree portrait, model turned slightly right, right ear fully visible, "
-     "graceful neck line, elegant profile angle",
-     "85mm lens, f/2.0, face and ear sharp"),
+    # ── FEMALE NECK / CHEST ───────────────────────────────────────────────────
+    *make_entries(
+        "female/neck_front", "female",
+        "Chest-up front portrait, neck and upper chest fully visible, "
+        "saree neckline elegant and low enough to show collarbone, "
+        "confident warm expression, shoulders back, posture perfect",
+        "70-85mm, chest-up framing, neck and collarbone as focal zone"
+    ),
+    *make_entries(
+        "female/neck_45", "female",
+        "45-degree chest-up portrait, neck at graceful angle, "
+        "saree draping naturally over shoulder, collarbone visible, "
+        "eyes looking slightly off-camera, contemplative elegance",
+        "70mm, 45-degree, chest and neck visible"
+    ),
+    *make_entries(
+        "female/neck_crop", "female",
+        "Intimate neck crop — chin to mid-chest only, no face visible, "
+        "neck and collarbone as the canvas, saree neckline framing the zone, "
+        "beautiful skin texture visible",
+        "100mm tight crop, neck and upper chest only"
+    ),
 
-    ("female/ear_v3.jpg",
-     "female", FEMALE_REF_NOTE,
-     "Side profile shot, model facing right, left ear fully revealed, "
-     "hair swept cleanly back, elegant neck curve visible",
-     "100mm lens, pure side profile, ear as focal point"),
+    # ── FEMALE HAND / FINGERS ─────────────────────────────────────────────────
+    *make_entries(
+        "female/hand_single", "female",
+        "Single right hand, fingers elegantly spread, slight downward tilt, "
+        "showing dorsal side of hand, manicured natural nails in nude/pink, "
+        "saree sleeve creating a soft frame at wrist, hand looks refined and feminine",
+        "100mm macro, hand in sharp detail"
+    ),
+    *make_entries(
+        "female/hand_both", "female",
+        "Both hands together, fingers gently overlapping or lightly clasped, "
+        "soft feminine gesture, both wrists visible, natural graceful pose",
+        "85mm, both hands centred in frame"
+    ),
+    *make_entries(
+        "female/hand_closeup", "female",
+        "Extreme close-up of fingers only — 3 or 4 fingers slightly fanned, "
+        "showing the finger joints clearly, ultra-detail on skin and nails, "
+        "soft bokeh background, intimate and precise",
+        "100mm macro extreme close-up, fingers only, ultra-sharp"
+    ),
 
-    # Neck zone
-    ("female/neck_v1.jpg",
-     "female", FEMALE_REF_NOTE,
-     "Chest-up front portrait, neck and upper chest fully visible, "
-     "saree neckline elegant, collarbone showing, confident warm expression",
-     "70mm lens, chest-up framing"),
+    # ── FEMALE WRIST ──────────────────────────────────────────────────────────
+    *make_entries(
+        "female/wrist_raised", "female",
+        "Single wrist raised elegantly at chest height, "
+        "inner wrist facing camera, forearm at 45-degree angle, "
+        "saree sleeve falling naturally, wrist looks delicate and graceful",
+        "100mm, wrist and forearm, inner wrist as focal point"
+    ),
+    *make_entries(
+        "female/wrist_both", "female",
+        "Both wrists held together at waist level, palms facing slightly inward, "
+        "symmetrical elegant pose, both inner wrists visible side by side",
+        "85mm, both wrists centred, symmetrical"
+    ),
+    *make_entries(
+        "female/wrist_profile", "female",
+        "Side profile of single wrist, arm extended naturally toward camera, "
+        "side view of wrist and lower forearm, "
+        "outer wrist bone visible, elegant gesture",
+        "100mm, wrist side profile, forearm"
+    ),
 
-    ("female/neck_v2.jpg",
-     "female", FEMALE_REF_NOTE,
-     "45-degree chest-up portrait, neck at slight angle, "
-     "saree draping naturally over shoulder, graceful neckline",
-     "70mm lens, 45-degree, chest visible"),
+    # ── FEMALE FEET ───────────────────────────────────────────────────────────
+    *make_entries(
+        "female/feet_standing", "female",
+        "Both feet standing on polished marble or cream stone floor, "
+        "toes pointing slightly outward, ankles visible, "
+        "saree hem just touching floor at top edge of frame, "
+        "elegant foot positioning, clean manicured nails",
+        "50-70mm, feet and ankles, looking down from above"
+    ),
+    *make_entries(
+        "female/feet_seated", "female",
+        "Seated feet, both feet resting flat on surface or floor, "
+        "ankles and lower shin visible, casual yet graceful, "
+        "saree or lehenga hem visible at top",
+        "70mm, seated feet detail, ankles"
+    ),
 
-    ("female/neck_v3.jpg",
-     "female", FEMALE_REF_NOTE,
-     "Close neck crop, chin to chest, neck and collarbone as focal point, "
-     "saree neckline clean, no face — intimate product focus",
-     "100mm close crop, neck and chest only"),
+    # ── FEMALE WAIST ──────────────────────────────────────────────────────────
+    *make_entries(
+        "female/waist_front", "female",
+        "Mid-body crop from bust to upper thigh, "
+        "waistline clearly visible, saree pleats falling perfectly, "
+        "blouse and saree draping elegant, hands resting naturally at sides",
+        "50-70mm, mid-body, waist as hero zone"
+    ),
 
-    # Hand / Fingers zone
-    ("female/hand_v1.jpg",
-     "female", FEMALE_REF_NOTE,
-     "Single right hand elegantly posed, fingers slightly spread, "
-     "showing palm side slightly, manicured natural nails, "
-     "wrist and lower forearm visible, saree sleeve at wrist",
-     "100mm macro, hand sharp"),
+    # ── MALE NECK ────────────────────────────────────────────────────────────
+    *make_entries(
+        "male/neck_front", "male",
+        "Chest-up front portrait, masculine neck and upper chest, "
+        "collar of kurta or shirt open slightly at neck, "
+        "confident expression, jaw strong, shoulders broad",
+        "70-85mm, chest-up, masculine neck prominent"
+    ),
+    *make_entries(
+        "male/neck_45", "male",
+        "45-degree chest portrait, neck at powerful angle, "
+        "collar styling visible, collar open, strong profile",
+        "70mm, 45-degree masculine portrait"
+    ),
 
-    ("female/hand_v2.jpg",
-     "female", FEMALE_REF_NOTE,
-     "Both hands together, fingers interlaced or overlapping, "
-     "elegant feminine hand pose, natural nails, wrists visible",
-     "85mm, both hands in frame"),
+    # ── MALE HAND ─────────────────────────────────────────────────────────────
+    *make_entries(
+        "male/hand_single", "male",
+        "Single strong masculine right hand, fingers spread with authority, "
+        "showing dorsal side, shirt or kurta cuff at wrist, "
+        "well-groomed nails, hand looks powerful and refined",
+        "100mm macro, masculine hand, strong and crisp"
+    ),
+    *make_entries(
+        "male/hand_both", "male",
+        "Both hands loosely clasped or one over the other, "
+        "masculine confident pose, suit or kurta sleeve visible at wrist",
+        "85mm, both hands, masculine and composed"
+    ),
 
-    ("female/hand_v3.jpg",
-     "female", FEMALE_REF_NOTE,
-     "Fingers close-up, single hand, fingers pointing gently downward, "
-     "ultra-close detail on fingers only, soft bokeh background",
-     "100mm macro extreme close-up, fingers only"),
-
-    # Wrist zone
-    ("female/wrist_v1.jpg",
-     "female", FEMALE_REF_NOTE,
-     "Single wrist raised elegantly at chest height, wrist turned to show inner wrist, "
-     "forearm visible, saree sleeve creating natural frame",
-     "100mm, wrist and forearm, sharp detail"),
-
-    ("female/wrist_v2.jpg",
-     "female", FEMALE_REF_NOTE,
-     "Both wrists together at waist level, palms facing slightly inward, "
-     "elegant symmetrical wrist pose, feminine and graceful",
-     "85mm, both wrists in frame, centred"),
-
-    ("female/wrist_v3.jpg",
-     "female", FEMALE_REF_NOTE,
-     "Single wrist raised toward camera, arm extended naturally, "
-     "profile of wrist showing side of forearm, elegant gesture",
-     "100mm, wrist profile, forearm visible"),
-
-    # Feet zone
-    ("female/feet_v1.jpg",
-     "female", FEMALE_REF_NOTE,
-     "Standing feet close-up, both feet on marble floor, "
-     "elegant foot positioning, toes pointing slightly outward, "
-     "ankles and lower shins visible, saree hem just visible at top",
-     "70mm, feet and ankles, marble floor"),
-
-    ("female/feet_v2.jpg",
-     "female", FEMALE_REF_NOTE,
-     "Seated feet, both feet resting on floor or surface, "
-     "casual elegant positioning, ankles visible, graceful",
-     "85mm, seated feet detail"),
-
-    ("female/feet_v3.jpg",
-     "female", FEMALE_REF_NOTE,
-     "Walking feet captured mid-step, slight motion, "
-     "one foot forward, ankles in gentle movement, candid",
-     "70mm, walking feet, slight motion blur on background"),
-
-    # Waist zone
-    ("female/waist_v1.jpg",
-     "female", FEMALE_REF_NOTE,
-     "Mid-body crop from chest to upper thigh, "
-     "waistline clearly visible, saree draping at waist, elegant pose",
-     "70mm, mid-body, waist as focal point"),
-
-    ("female/waist_v2.jpg",
-     "female", FEMALE_REF_NOTE,
-     "Three-quarter body, waist and hips visible, "
-     "model standing straight, full saree draping visible at waist",
-     "50mm, three-quarter body"),
-
-    # ── MALE BODY ZONES ───────────────────────────────────────────────────────
-
-    ("male/neck_v1.jpg",
-     "male", MALE_CONTEMPORARY,
-     "Chest-up front portrait, neck and upper chest visible, "
-     "collar of kurta or shirt open slightly at neck, confident expression",
-     "70mm, chest-up, masculine"),
-
-    ("male/neck_v2.jpg",
-     "male", MALE_CONTEMPORARY,
-     "45-degree chest portrait, neck at angle, "
-     "collar styling visible, confident profile",
-     "70mm, 45-degree masculine portrait"),
-
-    ("male/neck_v3.jpg",
-     "male", MALE_TRADITIONAL,
-     "Traditional kurta neck close-up, mandarin collar, "
-     "neck and chest as focal point, dignified expression",
-     "85mm, neck and chest, traditional"),
-
-    ("male/hand_v1.jpg",
-     "male", MALE_CONTEMPORARY,
-     "Single masculine right hand, fingers slightly spread, "
-     "strong capable hand pose, shirt or suit cuff at wrist",
-     "100mm macro, masculine hand"),
-
-    ("male/hand_v2.jpg",
-     "male", MALE_CONTEMPORARY,
-     "Both hands loosely clasped or one hand resting on the other, "
-     "masculine confident hand pose, suit or kurta sleeve visible",
-     "85mm, both hands, masculine"),
-
-    ("male/hand_v3.jpg",
-     "male", MALE_TRADITIONAL,
-     "Hand in traditional pose, fingers extended, "
-     "kurta sleeve at wrist, rich fabric visible, dignified",
-     "100mm, traditional hand pose"),
-
-    ("male/wrist_v1.jpg",
-     "male", MALE_CONTEMPORARY,
-     "Strong masculine wrist raised, inner wrist visible, "
-     "shirt cuff or kurta sleeve rolled slightly, confident",
-     "100mm, masculine wrist"),
-
-    ("male/wrist_v2.jpg",
-     "male", MALE_CONTEMPORARY,
-     "Crossed forearms, both wrists visible, "
-     "casual powerful pose, suit or smart casual",
-     "85mm, crossed arms, both wrists"),
-
-    ("male/wrist_v3.jpg",
-     "male", MALE_TRADITIONAL,
-     "Single wrist in traditional gesture, kurta sleeve, "
-     "dignified hand position, warm toned background",
-     "100mm, traditional wrist pose"),
+    # ── MALE WRIST ────────────────────────────────────────────────────────────
+    *make_entries(
+        "male/wrist_raised", "male",
+        "Strong masculine wrist raised, inner wrist visible, "
+        "shirt cuff or kurta sleeve, forearm looks capable and refined",
+        "100mm, masculine wrist and forearm"
+    ),
+    *make_entries(
+        "male/wrist_crossed", "male",
+        "Crossed forearms, both wrists clearly visible, "
+        "powerful casual pose, suit or smart casual styling",
+        "85mm, crossed arms, both wrists"
+    ),
 
     # ── KIDS ──────────────────────────────────────────────────────────────────
+    *make_entries(
+        "kids/girl_face", "kids_girl",
+        "Front face portrait, girl looking at camera, bright genuine smile, "
+        "ears visible with hair tucked back, flowers in hair, "
+        "natural joyful child expression",
+        "85mm f/2.0, child portrait, both ears visible, warm and sweet"
+    ),
+    *make_entries(
+        "kids/girl_neck", "kids_girl",
+        "Chest-up portrait, girl's neck and pavadai neckline visible, "
+        "traditional gold work at neckline, sweet expression, chin up slightly",
+        "70mm, child chest-up, neck and neckline"
+    ),
+    *make_entries(
+        "kids/boy_neck", "kids_boy",
+        "Chest-up portrait, boy in silk kurta, neck and collar visible, "
+        "mandarin collar or kurta neckline, cheerful and bright",
+        "70mm, child chest-up, kurta neckline"
+    ),
+    *make_entries(
+        "kids/girl_hand", "kids_girl",
+        "Child's small delicate hands, single hand or both together, "
+        "natural playful position, pavadai fabric visible, "
+        "tiny manicured nails, utterly adorable",
+        "85mm, child hands, small and delicate, soft bokeh"
+    ),
+)
 
-    ("kids/face_girl_v1.jpg",
-     "kids_girl", KIDS_GIRL,
-     "Front face portrait, girl looking at camera, bright smile, "
-     "ears visible, flowers in hair, joyful and natural",
-     "85mm, child portrait, both ears visible"),
-
-    ("kids/face_girl_v2.jpg",
-     "kids_girl", KIDS_GIRL,
-     "45-degree portrait, girl looking slightly sideways, "
-     "one ear visible, playful expression",
-     "85mm, 45-degree child portrait"),
-
-    ("kids/neck_girl_v1.jpg",
-     "kids_girl", KIDS_GIRL,
-     "Chest-up portrait, neck and pavadai neckline visible, "
-     "traditional gold thread work at neck area, sweet expression",
-     "70mm, child chest-up"),
-
-    ("kids/neck_boy_v1.jpg",
-     "kids_boy", KIDS_BOY,
-     "Chest-up portrait, boy in kurta, neck visible, "
-     "mandarin collar or kurta neckline, cheerful smile",
-     "70mm, child chest-up, kurta"),
-
-    ("kids/hand_girl_v1.jpg",
-     "kids_girl", KIDS_GIRL,
-     "Child's small delicate hands, both hands together or single hand, "
-     "natural playful pose, pavadai fabric visible",
-     "85mm, child hands, delicate"),
-]
-
-# ── Load Codex token ──────────────────────────────────────────────────────────
+# ── CODEX CALL ────────────────────────────────────────────────────────────────
 
 def _load_token():
     path = os.path.expanduser("~/.codex/auth.json")
     data = json.load(open(path))
     return data.get("tokens", {}).get("access_token", "")
 
-# ── Generate one reference image ──────────────────────────────────────────────
 
-def generate_reference(spec: tuple, female_ref_path: str = None) -> str:
-    """Generate one model reference image and save it."""
-    import requests, io
+def _encode_ref(path):
     from PIL import Image as _PIL
+    img = _PIL.open(path).convert("RGB")
+    img.thumbnail((768, 768))
+    buf = io.BytesIO()
+    img.save(buf, "JPEG", quality=88)
+    return base64.b64encode(buf.getvalue()).decode()
 
-    out_file, gender, model_desc, pose_desc, camera = spec
+
+def generate_one(spec, female_ref_path=None):
+    out_file, model_type, pose, camera, bg_key = spec
     out_path = os.path.join(MODELS_DIR, out_file)
 
     if os.path.exists(out_path):
-        print(f"  ✓ EXISTS: {out_file}")
+        print(f"  ✓ EXISTS")
         return out_path
 
     token = _load_token()
-    if not token:
-        raise Exception("No Codex token — run: npx @openai/codex login")
+    bg_desc = BG[bg_key]
 
-    # Build prompt
+    # Select model description
+    if model_type == "female":
+        model_desc = FEMALE_BASE
+    elif model_type == "male":
+        model_desc = MALE_BASE
+    elif model_type == "kids_girl":
+        model_desc = KIDS_GIRL_BASE
+    else:
+        model_desc = KIDS_BOY_BASE
+
     prompt = (
-        f"ARADHANA JEWELLERS — Model Library Reference Image\n\n"
-        f"MODEL: {model_desc}\n\n"
-        f"POSE / SHOT: {pose_desc}\n\n"
+        f"ARADHANA JEWELLERS — Model Reference Library Image\n\n"
+        f"MODEL STYLING:\n{model_desc}\n\n"
+        f"POSE:\n{pose}\n\n"
+        f"BACKGROUND:\n{bg_desc}\n\n"
         f"CAMERA: {camera}\n\n"
-        f"{STUDIO_LIGHTING}\n\n"
-        f"CRITICAL: The model must have NO jewellery visible — "
-        f"this is a blank reference pose for compositing jewellery onto later.\n"
-        f"Remove any jewellery that appears naturally on the model.\n\n"
-        f"Output: Square (1:1) professional studio photograph.\n"
-        f"Reply on last line: REF_DONE: {out_file}"
+        f"QUALITY:\n{QUALITY}\n\n"
+        f"CRITICAL — NO JEWELLERY: The model must have ZERO jewellery visible. "
+        f"This is a clean reference pose used for compositing jewellery later. "
+        f"Remove any jewellery that appears naturally.\n\n"
+        f"Reply last line: REF_DONE: {out_file}"
     )
 
-    # Build content — include female reference if available
     content = []
-    if "female" in gender and female_ref_path and os.path.exists(female_ref_path):
-        from PIL import Image as _P
-        import io as _io
-        img = _P.open(female_ref_path).convert("RGB")
-        img.thumbnail((768, 768))
-        buf = _io.BytesIO()
-        img.save(buf, "JPEG", quality=88)
-        b64 = base64.b64encode(buf.getvalue()).decode()
-        content.append({"type": "input_image", "image_url": f"data:image/jpeg;base64,{b64}"})
-
+    if model_type == "female" and female_ref_path and os.path.exists(female_ref_path):
+        b64 = _encode_ref(female_ref_path)
+        content.append({"type": "input_image",
+                         "image_url": f"data:image/jpeg;base64,{b64}"})
     content.append({"type": "input_text", "text": prompt})
 
     payload = {
         "model": "gpt-5.5",
         "stream": True,
-        "instructions": "You are a professional fashion photography AI.",
+        "instructions": "You are a professional luxury fashion photography AI.",
         "input": [{"type": "message", "role": "user", "content": content}],
         "tools": [{"type": "image_generation", "output_format": "png"}],
         "tool_choice": "required",
@@ -326,24 +348,24 @@ def generate_reference(spec: tuple, female_ref_path: str = None) -> str:
         "text": {"verbosity": "low"},
     }
 
-    headers = {
+    import requests as _req
+    sess = _req.Session()
+    sess.headers.update({
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json",
         "Accept": "text/event-stream",
-        "User-Agent": "aradhana-model-library/1.0",
-    }
+        "User-Agent": "aradhana-model-library/2.0",
+    })
 
-    import requests as _req
-    sess = _req.Session()
-    sess.headers.update(headers)
-
-    result_b64 = None
     resp = sess.post("https://chatgpt.com/backend-api/codex/responses",
                      json=payload, stream=True, timeout=120)
 
+    if resp.status_code == 429:
+        raise Exception("CODEX_RATE_LIMIT")
     if resp.status_code != 200:
         raise Exception(f"HTTP {resp.status_code}: {resp.text[:200]}")
 
+    result_b64 = None
     for raw_line in resp.iter_lines():
         if not raw_line: continue
         line = raw_line.decode("utf-8", errors="replace")
@@ -351,8 +373,7 @@ def generate_reference(spec: tuple, female_ref_path: str = None) -> str:
         data_str = line[5:].strip()
         if data_str == "[DONE]": break
         try:
-            import json as _j
-            evt = _j.loads(data_str)
+            evt = json.loads(data_str)
             if evt.get("type") == "response.output_item.done":
                 item = evt.get("item", {})
                 if item.get("type") == "image_generation_call":
@@ -363,57 +384,63 @@ def generate_reference(spec: tuple, female_ref_path: str = None) -> str:
     if not result_b64:
         raise Exception("No image in response")
 
-    # Save as JPEG
+    from PIL import Image as _PIL
     png_data = base64.b64decode(result_b64)
     img = _PIL.open(io.BytesIO(png_data)).convert("RGB")
-    img.save(out_path, "JPEG", quality=92)
-    print(f"  ✓ SAVED: {out_file} ({os.path.getsize(out_path)//1024}KB)")
+    img.save(out_path, "JPEG", quality=93)
     return out_path
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+# ── MAIN ──────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    print("=" * 60)
-    print("ARADHANA JEWELLERS — Model Library Generator")
-    print(f"Generating {len(LIBRARY)} reference images")
-    print("=" * 60)
+    # Clear old library first
+    import shutil
+    for zone_dir in (FEMALE_DIR, MALE_DIR, KIDS_DIR):
+        for f in os.listdir(zone_dir):
+            if f.endswith(".jpg"):
+                os.remove(os.path.join(zone_dir, f))
+    print("Old library cleared.")
 
-    # Check for female reference
-    female_ref = os.path.join(FEMALE_DIR, "pose1_front.jpg")
-    if not os.path.exists(female_ref):
-        # Try other poses
-        for p in ["pose2_gesture.jpg", "pose3_45deg.jpg", "reference.jpg"]:
-            candidate = os.path.join(FEMALE_DIR, p)
-            if os.path.exists(candidate):
-                female_ref = candidate
-                break
-        else:
-            female_ref = None
-            print("⚠ No female reference photo found in models/female/")
-            print("  Save one of the 3 Aradhana model photos as models/female/pose1_front.jpg")
-            print("  Continuing with AI-described model (no face reference)...")
-            print()
+    total = len(LIBRARY)
+    print(f"{'='*60}")
+    print(f"ARADHANA MODEL LIBRARY v2 — {total} reference images")
+    print(f"Philosophy: same pose × 3 backgrounds (A=cream / B=gold / C=dark)")
+    print(f"Female: editorial glamour styling, NOT store uniform")
+    print(f"{'='*60}\n")
+
+    # Find female reference
+    female_ref = None
+    for fn in ["pose1_front.jpg", "pose2_gesture.jpg", "pose3_45deg.jpg", "reference.jpg"]:
+        p = os.path.join(FEMALE_DIR, fn)
+        if os.path.exists(p):
+            female_ref = p
+            print(f"Female reference: {fn}\n")
+            break
+    if not female_ref:
+        print("⚠ No female reference found in models/female/ — AI will generate without face ref\n")
 
     done, errors = 0, []
     for i, spec in enumerate(LIBRARY, 1):
-        out_file = spec[0]
-        print(f"[{i:02d}/{len(LIBRARY)}] {out_file}...", end=" ", flush=True)
+        out_file, _, pose_preview, _, bg_key = spec
+        short_pose = pose_preview[:50].replace('\n','')
+        print(f"[{i:02d}/{total}] {out_file} (BG-{bg_key})... ", end="", flush=True)
         try:
-            generate_reference(spec, female_ref)
+            generate_one(spec, female_ref)
             done += 1
-            time.sleep(2)   # gentle pacing
+            print(f"✓  ({done}/{total} done)")
+            time.sleep(3)
         except Exception as e:
             print(f"✗ {e}")
             errors.append((out_file, str(e)))
             if "RATE_LIMIT" in str(e):
-                print("  Rate limited — waiting 120s...")
-                time.sleep(120)
+                print("  Rate limited — waiting 90s...")
+                time.sleep(90)
 
     print(f"\n{'='*60}")
-    print(f"Done: {done}/{len(LIBRARY)} images generated")
+    print(f"Complete: {done}/{total} generated")
     if errors:
-        print(f"Errors ({len(errors)}):")
-        for f, e in errors: print(f"  {f}: {e}")
-    print(f"\nModel library saved to: {MODELS_DIR}")
-    print("You can now use these as compositing references in the catalogue tool.")
+        print(f"Errors: {len(errors)}")
+        for f, e in errors:
+            print(f"  {f}: {e}")
+    print(f"\nLibrary at: {MODELS_DIR}")

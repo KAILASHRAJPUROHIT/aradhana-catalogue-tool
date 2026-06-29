@@ -90,8 +90,11 @@ def generate(jewel_path: str, tag_path: str, bg_path: str,
 
         f"COMPOSITION RULES — follow these exactly every time:\n"
         f"1. PEDESTAL — MANDATORY: EVERY earring pair MUST be placed ON TOP of the white "
-        f"   circular pedestal/plinth in the background. The earrings must be resting ON the "
-        f"   pedestal surface — never floating in front of the background wall\n"
+        f"   circular pedestal/plinth in the background. The bottom of the earrings must be "
+        f"   physically touching and resting on the flat top surface of the pedestal. "
+        f"   The earrings must NOT float in air, NOT appear in front of the background wall, "
+        f"   NOT be placed below the pedestal edge. They sit ON the pedestal surface like "
+        f"   objects placed on a table — the pedestal supports them from below\n"
         f"2. SIZE — CRITICAL: make the earrings as LARGE as possible. "
         f"   Each earring should fill 60–75% of the pedestal diameter. "
         f"   The pair together should nearly span the full width of the pedestal. "

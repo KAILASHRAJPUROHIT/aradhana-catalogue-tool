@@ -69,7 +69,12 @@ def generate(jewel_path: str, tag_path: str, bg_path: str,
         return {"output": None, "label": label, "error": f"Image encode error: {e}"}
 
     cat_label = category.replace("_", " ").title()
-    prompt = (
+
+    # Allow model shoot to inject a completely custom prompt
+    if model_prompt_override:
+        prompt = model_prompt_override
+    else:
+      prompt = (
         f"You have 3 images: image 1 = {cat_label} jewellery photo, "
         f"image 2 = price tag, image 3 = studio background scene.\n\n"
 

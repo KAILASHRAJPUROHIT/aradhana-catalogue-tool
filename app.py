@@ -984,68 +984,86 @@ def api_codex_run():
 
     def _run():
         import codex_img, catalogue_db
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        import threading
+
         progress = _load_progress(category)
         out_dir  = os.path.join(OUTPUT, category)
         os.makedirs(out_dir, exist_ok=True)
-        results  = []
+        results     = []
+        results_lock = threading.Lock()
+        done_count  = [0]
 
-        for i, s in enumerate(pairs):
+        # Skip already-completed pairs
+        todo = []
+        for s in pairs:
             pair_key = str(s["pair"])
-            folder   = s.get("folder") or (PROCESSING if s.get("staged") else INPUT)
-            jewel    = os.path.join(folder, s["jewel"])
-            tag      = os.path.join(folder, s["tag"]) if s.get("tag") else jewel
-
             if pair_key in progress and progress[pair_key].get("output"):
                 saved = progress[pair_key]
-                results.append({"pair": s["pair"], "sku": saved["label"],
-                                "output": saved["output"], "error": None,
-                                "skipped": True, "engine": "codex"})
-                CGPT_JOB["done"]    = i + 1
-                CGPT_JOB["results"] = results
-                continue
+                with results_lock:
+                    results.append({"pair": s["pair"], "sku": saved["label"],
+                                    "output": saved["output"], "error": None,
+                                    "skipped": True, "engine": "codex"})
+                    done_count[0] += 1
+                    CGPT_JOB["done"]    = done_count[0]
+                    CGPT_JOB["results"] = list(results)
+            else:
+                todo.append(s)
 
-            CGPT_JOB["current"] = f"Codex · pair {s['pair']}"
+        CGPT_JOB["current"] = f"🟢 Codex · {len(todo)} pairs · 5 parallel workers"
+
+        def _process_one(s):
+            folder = s.get("folder") or (PROCESSING if s.get("staged") else INPUT)
+            jewel  = os.path.join(folder, s["jewel"])
+            tag    = os.path.join(folder, s["tag"]) if s.get("tag") else jewel
+
             r = {"error": "not started"}
             for attempt in range(3):
                 r = codex_img.generate(
                     jewel_path=jewel, tag_path=tag, bg_path=bg_path,
                     category=category, label=f"AJ-{s['pair']:03d}",
-                    status_fn=lambda m: CGPT_JOB.update({"current": m})
                 )
-                err = r.get("error", "")
-                if "CODEX_RATE_LIMIT" in (err or ""):
-                    wait = 120  # 2 min cooldown on rate limit
-                    CGPT_JOB["current"] = f"⏳ Codex rate limited — cooling {wait}s"
-                    time.sleep(wait)
+                if "CODEX_RATE_LIMIT" in (r.get("error") or ""):
+                    CGPT_JOB["current"] = f"⏳ Rate limited — cooling 120s"
+                    time.sleep(120)
                     continue
                 break
 
-            label = r.get("label") or f"AJ-{s['pair']:03d}"
-            safe  = re.sub(r'[/\\:*?"<>|]', '_', label)
+            label    = r.get("label") or f"AJ-{s['pair']:03d}"
+            safe     = re.sub(r'[/\\:*?"<>|]', '_', label)
             out_path = os.path.join(out_dir, f"{safe}_codex.png")
+            entry    = {"pair": s["pair"], "sku": label, "engine": "codex"}
 
             if r.get("output") and os.path.exists(r["output"]):
                 os.replace(r["output"], out_path)
-                jcheck = catalogue_db.verify_jewellery_present(out_path)
-                if not jcheck["ok"]:
-                    CGPT_JOB["current"] = f"⚠ No jewellery detected — skipping pair {s['pair']}"
-                    results.append({"pair": s["pair"], "sku": label, "output": None,
-                                   "error": f"Empty output: {jcheck['reason'][:60]}",
-                                   "engine": "codex"})
-                else:
-                    findings = catalogue_db.check_and_record(label, out_path, category)
-                    _save_progress(category, pair_key, label, f"{category}/{safe}_codex.png")
-                    results.append({"pair": s["pair"], "sku": label,
-                                   "output": f"{category}/{safe}_codex.png",
-                                   "error": None, "engine": "codex",
-                                   "duplicate": bool(findings),
-                                   "findings": findings})
+                # Jewellery check only on suspiciously small files (<200KB)
+                sz = os.path.getsize(out_path)
+                if sz < 200_000:
+                    jcheck = catalogue_db.verify_jewellery_present(out_path)
+                    if not jcheck["ok"]:
+                        entry.update({"output": None,
+                                      "error": f"Empty: {jcheck['reason'][:60]}"})
+                        return entry
+                findings = catalogue_db.check_and_record(label, out_path, category)
+                _save_progress(category, str(s["pair"]), label, f"{category}/{safe}_codex.png")
+                entry.update({"output": f"{category}/{safe}_codex.png", "error": None,
+                              "duplicate": bool(findings), "findings": findings or []})
             else:
-                results.append({"pair": s["pair"], "sku": label, "output": None,
-                               "error": r.get("error", "failed"), "engine": "codex"})
+                entry.update({"output": None, "error": r.get("error", "failed")})
+            return entry
 
-            CGPT_JOB["done"]    = i + 1
-            CGPT_JOB["results"] = results
+        # Run up to 5 workers in parallel
+        with ThreadPoolExecutor(max_workers=5) as pool:
+            futures = {pool.submit(_process_one, s): s for s in todo}
+            for fut in as_completed(futures):
+                entry = fut.result()
+                with results_lock:
+                    results.append(entry)
+                    done_count[0] += 1
+                    CGPT_JOB["done"]    = done_count[0]
+                    CGPT_JOB["results"] = sorted(results, key=lambda r: r.get("pair", 0))
+                    CGPT_JOB["current"] = (f"Codex · {done_count[0]}/{len(pairs)} · "
+                                           f"{entry.get('sku','?')} {'✓' if entry.get('output') else '✗'}")
 
         CGPT_JOB["running"] = False
         CGPT_JOB["current"] = "done"

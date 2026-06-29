@@ -795,6 +795,19 @@ async function runGemini() {
     body: JSON.stringify({category: cat, bg: _selBg})});
   startPolling();
 }
+function toggleModelSettings() {
+  const enabled = document.getElementById('modelEnabled').checked;
+  document.getElementById('modelSettings').style.display = enabled ? 'block' : 'none';
+}
+
+function _getModelConfig() {
+  return {
+    enabled:     document.getElementById('modelEnabled')?.checked || false,
+    bodyPart:    document.getElementById('bodyPartSelect')?.value || 'auto',
+    variants:    parseInt(document.getElementById('variantCount')?.value || '3'),
+  };
+}
+
 async function runCodex() {
   const cat = _cat(); if (!cat) return;
   _setBtns(true); _startProgress('Starting Codex — 5 parallel workers…');

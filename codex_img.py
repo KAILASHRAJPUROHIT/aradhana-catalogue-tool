@@ -45,7 +45,7 @@ def _encode_image(path: str, max_edge: int = 768) -> tuple[str, str]:
 
 def generate(jewel_path: str, tag_path: str, bg_path: str,
              category: str = "earrings", label: str = "studio",
-             status_fn=None) -> dict:
+             status_fn=None, model_prompt_override: str = None) -> dict:
     """
     Send 3 images to ChatGPT via the Codex endpoint and get back a generated image.
     Returns {"output": path, "label": label, "error": None} or {"error": ...}

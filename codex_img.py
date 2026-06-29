@@ -126,7 +126,9 @@ def generate(jewel_path: str, tag_path: str, bg_path: str,
     _SESSION.headers["Authorization"] = f"Bearer {token}"
     _st("Sending to Codex endpoint…")
 
-    result_b64 = None
+    result_b64  = None
+    text_chunks = []   # collect text delta to extract LABEL
+
     try:
         resp = _SESSION.post(ENDPOINT, json=payload, stream=True, timeout=120)
         if resp.status_code == 429 or "rate" in resp.text[:200].lower():
@@ -149,11 +151,18 @@ def generate(jewel_path: str, tag_path: str, bg_path: str,
             try:
                 evt = json.loads(data_str)
                 t   = evt.get("type", "")
-                if t == "response.image_generation_call.partial_image":
-                    pass  # skip partial log noise
+
+                # Capture text output (contains LABEL: TP22/157)
+                if t in ("response.output_text.delta", "response.text.delta"):
+                    text_chunks.append(evt.get("delta", ""))
                 elif t == "response.output_item.done":
                     item = evt.get("item", {})
-                    if item.get("type") == "image_generation_call":
+                    if item.get("type") == "message":
+                        # Full text message — extract label
+                        for block in item.get("content", []):
+                            if block.get("type") == "output_text":
+                                text_chunks.append(block.get("text", ""))
+                    elif item.get("type") == "image_generation_call":
                         result_b64 = item.get("result", "")
                         _st("✅ Image received!")
             except json.JSONDecodeError:
@@ -161,6 +170,16 @@ def generate(jewel_path: str, tag_path: str, bg_path: str,
 
     except Exception as e:
         return {"output": None, "label": label, "error": str(e)}
+
+    # Parse LABEL from text response
+    full_text = "".join(text_chunks)
+    import re as _re2
+    m = _re2.search(r"LABEL[:\s]+([A-Z][A-Z0-9/_-]{1,18})", full_text)
+    if m and " " not in m.group(1):
+        label = m.group(1).strip()
+        _st(f"🏷️ Label from response: {label}")
+    else:
+        _st(f"⚠ Label not found in response — using fallback ({label})")
 
     if not result_b64:
         return {"output": None, "label": label, "error": "No image in response"}

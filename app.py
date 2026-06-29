@@ -1047,9 +1047,48 @@ def api_codex_run():
                                       "error": f"Empty: {jcheck['reason'][:60]}"})
                         return entry
                 findings = catalogue_db.check_and_record(label, out_path, category)
-                _save_progress(category, str(s["pair"]), label, f"{category}/{safe}_codex.png")
-                entry.update({"output": f"{category}/{safe}_codex.png", "error": None,
+                _save_progress(category, str(s["pair"]), label, f"{category}/{safe}.jpg")
+                entry.update({"output": f"{category}/{safe}.jpg", "error": None,
                               "duplicate": bool(findings), "findings": findings or []})
+
+                # ── Model shoot variants ───────────────────────────────────────
+                if model_cfg.get("enabled") and not bool(findings):
+                    try:
+                        import model_engine
+                        cfg       = model_engine.get_shot_config(
+                            category, model_cfg.get("bodyPart", "auto"))
+                        n_variants = int(model_cfg.get("variants", 3))
+                        model_outputs = []
+
+                        for v in range(1, n_variants + 1):
+                            CGPT_JOB["current"] = (
+                                f"Model shoot {v}/{n_variants} · {label} · {cfg['scene']}")
+                            prompt = model_engine.build_model_prompt(
+                                category, f"{label}_M{v}", cfg, v)
+
+                            # Use ChatGPT browser for model images
+                            import chatgpt_bg
+                            _d = chatgpt_bg.connect()
+                            chatgpt_bg.start_batch_chat(_d)
+                            mr = chatgpt_bg.process(
+                                jewel_path=jewel,
+                                tag_path=tag or jewel,
+                                bg_path=out_path,   # use studio shot as ref
+                                category=category,
+                                pair_num=f"M{v}",
+                                job_id=f"{label}_model{v}",
+                            )
+                            if mr.get("output") and os.path.exists(mr["output"]):
+                                model_path = os.path.join(
+                                    out_dir, f"{safe}_model_{v}.jpg")
+                                os.replace(mr["output"], model_path)
+                                model_outputs.append(
+                                    f"{category}/{safe}_model_{v}.jpg")
+
+                        if model_outputs:
+                            entry["model_outputs"] = model_outputs
+                    except Exception as me:
+                        entry["model_error"] = str(me)
             else:
                 entry.update({"output": None, "error": r.get("error", "failed")})
             return entry

@@ -105,53 +105,42 @@ def generate(jewel_path: str, tag_path: str, bg_path: str,
         "text": {"verbosity": "low"},
     }
 
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json",
-        "Accept": "text/event-stream",
-        "User-Agent": "chatgpt-imagegen/0.16.1",
-    }
-
-    _st("Sending to ChatGPT codex endpoint…")
-    body = json.dumps(payload).encode()
-    req = urllib.request.Request(ENDPOINT, data=body, headers=headers, method="POST")
+    _SESSION.headers["Authorization"] = f"Bearer {token}"
+    _st("Sending to Codex endpoint…")
 
     result_b64 = None
     try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            _st("Streaming response…")
-            buf = b""
-            for chunk in iter(lambda: resp.read(4096), b""):
-                buf += chunk
-                while b"\n" in buf:
-                    line, buf = buf.split(b"\n", 1)
-                    line = line.decode("utf-8", errors="replace").strip()
-                    if not line.startswith("data:"):
-                        continue
-                    data_str = line[5:].strip()
-                    if data_str == "[DONE]":
-                        break
-                    try:
-                        evt = json.loads(data_str)
-                        t = evt.get("type", "")
-                        if t == "response.image_generation_call.in_progress":
-                            _st("⬛ Generating image…")
-                        elif t == "response.image_generation_call.partial_image":
-                            _st(f"  partial ({evt.get('partial_image_index',0)})")
-                        elif t == "response.output_item.done":
-                            item = evt.get("item", {})
-                            if item.get("type") == "image_generation_call":
-                                result_b64 = item.get("result", "")
-                                _st("✅ Image received!")
-                    except json.JSONDecodeError:
-                        pass
+        resp = _SESSION.post(ENDPOINT, json=payload, stream=True, timeout=120)
+        if resp.status_code == 429 or "rate" in resp.text[:200].lower():
+            return {"output": None, "label": label,
+                    "error": f"CODEX_RATE_LIMIT: {resp.text[:100]}"}
+        if resp.status_code != 200:
+            return {"output": None, "label": label,
+                    "error": f"HTTP {resp.status_code}: {resp.text[:200]}"}
 
-    except urllib.error.HTTPError as e:
-        body_txt = e.read().decode("utf-8", errors="replace")[:300]
-        # Tag rate limit errors so the caller can wait and retry
-        if e.code == 429 or "rate" in body_txt.lower() or "quota" in body_txt.lower():
-            return {"output": None, "label": label, "error": f"CODEX_RATE_LIMIT: {body_txt[:100]}"}
-        return {"output": None, "label": label, "error": f"HTTP {e.code}: {body_txt}"}
+        _st("⬛ Generating…")
+        for raw_line in resp.iter_lines():
+            if not raw_line:
+                continue
+            line = raw_line.decode("utf-8", errors="replace")
+            if not line.startswith("data:"):
+                continue
+            data_str = line[5:].strip()
+            if data_str == "[DONE]":
+                break
+            try:
+                evt = json.loads(data_str)
+                t   = evt.get("type", "")
+                if t == "response.image_generation_call.partial_image":
+                    pass  # skip partial log noise
+                elif t == "response.output_item.done":
+                    item = evt.get("item", {})
+                    if item.get("type") == "image_generation_call":
+                        result_b64 = item.get("result", "")
+                        _st("✅ Image received!")
+            except json.JSONDecodeError:
+                pass
+
     except Exception as e:
         return {"output": None, "label": label, "error": str(e)}
 

@@ -330,9 +330,16 @@ def generate_one(spec, female_ref_path=None):
         f"Reply last line: REF_DONE: {out_file}"
     )
 
+    # Reference photo paths
+    male_ref_path = os.path.join(MALE_DIR, "reference.jpg")
+
     content = []
     if model_type == "female" and female_ref_path and os.path.exists(female_ref_path):
         b64 = _encode_ref(female_ref_path)
+        content.append({"type": "input_image",
+                         "image_url": f"data:image/jpeg;base64,{b64}"})
+    elif model_type == "male" and os.path.exists(male_ref_path):
+        b64 = _encode_ref(male_ref_path)
         content.append({"type": "input_image",
                          "image_url": f"data:image/jpeg;base64,{b64}"})
     content.append({"type": "input_text", "text": prompt})

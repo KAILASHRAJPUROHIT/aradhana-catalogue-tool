@@ -937,19 +937,35 @@ function showResults(results) {
         </div>`;
     }
 
-    if (r.output) return `
-      <div class="result-card">
-        <img class="result-img" src="/img/output/${r.output}?t=${Date.now()}" onerror="this.style.display='none'">
-        <div class="result-body">
-          <div class="result-sku">${r.sku||'—'}</div>
-          <div class="result-meta"><span class="result-badge badge-ok">Saved</span>${engine}</div>
+    if (r.output) {
+      const modelCards = (r.model_outputs || []).map((mo, mi) => `
+        <div class="result-card" style="border-color:rgba(139,92,246,0.3)">
+          <img class="result-img" src="/img/output/${mo}?t=${Date.now()}" onerror="this.style.display='none'">
+          <div class="result-body">
+            <div class="result-sku">${r.sku||'—'}</div>
+            <div class="result-meta">
+              <span class="result-badge" style="background:rgba(139,92,246,0.15);color:var(--gem)">
+                <i class="fa-solid fa-person"></i> Model ${mi+1}
+              </span>
+            </div>
+          </div>
+        </div>`).join('');
+
+      return `
+        <div class="result-card">
+          <img class="result-img" src="/img/output/${r.output}?t=${Date.now()}" onerror="this.style.display='none'">
+          <div class="result-body">
+            <div class="result-sku">${r.sku||'—'}</div>
+            <div class="result-meta"><span class="result-badge badge-ok">Studio</span>${engine}</div>
+          </div>
+          <div class="result-actions">
+            <button class="btn btn-danger btn-sm" onclick="rejectResult(${r.pair},'${r.sku||''}')">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
         </div>
-        <div class="result-actions">
-          <button class="btn btn-danger btn-sm" onclick="rejectResult(${r.pair},'${r.sku||''}')">
-            <i class="fa-solid fa-xmark"></i>
-          </button>
-        </div>
-      </div>`;
+        ${modelCards}`;
+    }
 
     return `
       <div class="result-card error-state">

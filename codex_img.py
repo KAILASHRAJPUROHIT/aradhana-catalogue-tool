@@ -196,10 +196,23 @@ def generate(jewel_path: str, tag_path: str, bg_path: str,
     # Parse LABEL from text response
     full_text = "".join(text_chunks)
     import re as _re2
-    m = _re2.search(r"LABEL[:\s]+([A-Z][A-Z0-9/_-]{1,18})", full_text)
-    if m and " " not in m.group(1):
-        label = m.group(1).strip()
-        _st(f"🏷️ Label from response: {label}")
+
+    # Try tight pattern first: LABEL followed by colon/space then the code
+    # Code format examples: TP22/30  JB617  E2QS0  TP18/8
+    m = _re2.search(r"LABEL\s*[:\-]\s*([A-Z][A-Z0-9/_-]{1,15})(?=[^A-Z0-9/_-]|$)", full_text)
+    if not m:
+        # Wider fallback
+        m = _re2.search(r"LABEL[:\s]+([A-Z0-9]{2,18}(?:[/_-][A-Z0-9]+)?)", full_text)
+
+    if m:
+        raw = m.group(1).strip().rstrip(".")
+        # Strip accidental "LABEL" suffix that sometimes appears
+        raw = _re2.sub(r"LABEL.*$", "", raw, flags=_re2.IGNORECASE).strip("/_- ")
+        if len(raw) >= 2 and " " not in raw:
+            label = raw
+            _st(f"🏷️ Label: {label}")
+        else:
+            _st(f"⚠ Label parse gave bad result '{raw}' — using fallback ({label})")
     else:
         _st(f"⚠ Label not found in response — using fallback ({label})")
 

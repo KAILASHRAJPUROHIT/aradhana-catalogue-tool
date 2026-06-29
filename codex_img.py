@@ -70,16 +70,34 @@ def generate(jewel_path: str, tag_path: str, bg_path: str,
 
     cat_label = category.replace("_", " ").title()
     prompt = (
-        f"You have 3 images: image 1 = {cat_label} jewellery, "
-        f"image 2 = price tag, image 3 = background. "
-        f"Extract ONLY the bare metal {cat_label} from image 1 — "
-        f"remove the display stand, holder, price tags and props completely. "
-        f"Place the jewellery centred on the background from image 3. "
-        f"If a pair: both pieces perfectly straight, symmetrical, evenly spaced. "
-        f"Professional studio lighting. NO text, watermarks, or numbers. "
-        f"Preserve exact design, colour and finish — do NOT redraw. "
-        f"Read the item code from the tag in image 2 and reply: "
-        f"LABEL: <code>"
+        f"You have 3 images: image 1 = {cat_label} jewellery photo, "
+        f"image 2 = price tag, image 3 = studio background scene.\n\n"
+
+        f"TASK: Extract ONLY the bare metal {cat_label} from image 1 and "
+        f"composite it onto the background scene in image 3.\n\n"
+
+        f"EXTRACTION RULES:\n"
+        f"- Remove the display stand, holder, velvet prop, price tags and ALL non-jewellery elements\n"
+        f"- Keep ONLY the bare metal jewellery pieces\n"
+        f"- Preserve exact design, colour, texture and finish — do NOT redraw or stylise\n\n"
+
+        f"COMPOSITION RULES — follow these exactly every time:\n"
+        f"1. If the background has a white circular pedestal/plinth: place both earrings "
+        f"   ON TOP of the pedestal surface, centered on it\n"
+        f"2. PAIR PLACEMENT: both pieces side by side, horizontally centered, "
+        f"   with equal gap between them (gap = roughly one earring width)\n"
+        f"3. SIZE: each earring should occupy 25–35% of the pedestal diameter. "
+        f"   Neither too small (postage-stamp size) nor too large (overflowing the pedestal)\n"
+        f"4. VERTICAL: earrings sit on the pedestal surface — not floating above the background, "
+        f"   not sunken into it\n"
+        f"5. SYMMETRY: both pieces must be exactly the same size, at the same height, "
+        f"   perfectly mirrored — never one higher or larger than the other\n"
+        f"6. BACKGROUND SCALE: show the full background scene at its natural zoom level — "
+        f"   do not crop or zoom into the background\n"
+        f"7. LIGHTING: use the same professional studio lighting direction as image 3\n"
+        f"8. NO text, watermarks, numbers, or branding anywhere in the output\n\n"
+
+        f"Read the item code from the tag in image 2 and reply: LABEL: <code>"
     )
 
     payload = {

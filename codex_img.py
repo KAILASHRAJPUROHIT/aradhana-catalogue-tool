@@ -119,7 +119,10 @@ def generate(jewel_path: str, tag_path: str, bg_path: str,
         f"   behind or beneath the earrings on the pedestal to make them shimmer\n"
         f"9. NO additional text, numbers or extra branding beyond what is already in image 3\n\n"
 
-        f"Read the item code from the tag in image 2 and reply: LABEL: <code>"
+        f"After generating the image, output ONLY this on the last line:\n"
+        f"LABEL: <exact item code from tag in image 2>\n"
+        f"Example: LABEL: TP22/30\n"
+        f"Do NOT write 'LABEL:' anywhere else in your reply."
     )
 
     payload = {

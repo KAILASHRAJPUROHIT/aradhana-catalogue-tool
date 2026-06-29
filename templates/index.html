@@ -810,9 +810,11 @@ function _getModelConfig() {
 
 async function runCodex() {
   const cat = _cat(); if (!cat) return;
-  _setBtns(true); _startProgress('Starting Codex — 5 parallel workers…');
+  const model = _getModelConfig();
+  const label = model.enabled ? `Starting Codex + Model shoot (${model.variants} variants)…` : 'Starting Codex — 5 parallel workers…';
+  _setBtns(true); _startProgress(label);
   await fetch('/api/codex_run', {method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({category: cat, bg: _selBg})});
+    body: JSON.stringify({category: cat, bg: _selBg, model})});
   startPolling();
 }
 async function runParallel() {
